@@ -9,7 +9,20 @@ function Home() {
             <Header />
             <Hero />
             <main className="home-content">
-                {/* Add your content here */}
+                <section className="features">
+                    <div className="feature-card">
+                        <h3>Fast</h3>
+                        <p>Lightning quick performance.</p>
+                    </div>
+                    <div className="feature-card">
+                        <h3>Simple</h3>
+                        <p>Clean and easy to use.</p>
+                    </div>
+                    <div className="feature-card">
+                        <h3>Reliable</h3>
+                        <p>Built to last.</p>
+                    </div>
+                </section>
             </main>
         </div>
     );
