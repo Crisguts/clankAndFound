@@ -88,7 +88,8 @@ using ( exists (select 1 from profiles where id = auth.uid() and role = 'assista
 
 -- Inquiries: Users see OWN, Assistants see ALL
 create policy "Users can insert inquiries" on inquiries for insert to authenticated with check (auth.uid() = user_id);
-create policy "Public can insert inquiries" on inquiries for insert with check (true);  -- Allow all inserts for testing
+create policy "Public can insert inquiries" on inquiries for insert to public with check (true);  -- Allow all inserts for testing
+create policy "Public can select own insert" on inquiries for select to public using (user_id is null);  -- Anonymous can read anonymous submissions
 create policy "Users can select own inquiries" on inquiries for select to authenticated using (auth.uid() = user_id);
 create policy "Assistants can select all inquiries" on inquiries for select to authenticated using ( exists (select 1 from profiles where id = auth.uid() and role = 'assistant') );
 create policy "Assistants can update inquiries" on inquiries for update to authenticated using ( exists (select 1 from profiles where id = auth.uid() and role = 'assistant') );
