@@ -109,7 +109,9 @@ router.post("/inventory", upload.single("image"), async (req, res) => {
 
     if (uploadError) {
       console.error("Supabase Upload Error:", uploadError);
-      return res.status(500).json({ error: "Failed to upload image" });
+      return res
+        .status(500)
+        .json({ error: "Failed to upload image", details: uploadError });
     }
 
     const {
@@ -130,7 +132,9 @@ router.post("/inventory", upload.single("image"), async (req, res) => {
 
     if (insertError) {
       console.error("Supabase Insert Error:", insertError);
-      return res.status(500).json({ error: "Failed to save inventory item" });
+      return res
+        .status(500)
+        .json({ error: "Failed to save inventory item", details: insertError });
     }
 
     res
@@ -138,7 +142,10 @@ router.post("/inventory", upload.single("image"), async (req, res) => {
       .json({ message: "Item added to inventory", data: insertData[0] });
   } catch (error) {
     console.error("Error adding to inventory:", error);
-    res.status(500).json({ error: "Internal Server Error" });
+    res.status(500).json({
+      error: error.message || "Internal Server Error",
+      stack: error.stack,
+    });
   }
 });
 

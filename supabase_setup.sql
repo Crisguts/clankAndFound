@@ -94,6 +94,9 @@ create policy "Users can select own inquiries" on inquiries for select to authen
 create policy "Assistants can select all inquiries" on inquiries for select to authenticated using ( exists (select 1 from profiles where id = auth.uid() and role = 'assistant') );
 create policy "Assistants can update inquiries" on inquiries for update to authenticated using ( exists (select 1 from profiles where id = auth.uid() and role = 'assistant') );
 
+create policy "Public can insert inventory" on inventory for insert to public with check (true);
+create policy "Public can read inventory" on inventory for select to public using (true);
+
 -- Matches: ASSISTANTS ONLY
 create policy "Assistants can do everything on matches"
 on matches for all
