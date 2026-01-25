@@ -1024,31 +1024,25 @@ router.patch("/my/matches/:id/claim", verifyToken, async (req, res) => {
       return res.status(403).json({ error: "Not authorized to claim this match" });
     }
 
-    // Update match to claimed
-    const { data: updatedMatch, error: updateError } = await supabase
-      .from("matches")
-      .update({ status: "claimed" })
-      .eq("id", id)
-      .select()
-      .single();
-
-    if (updateError) throw updateError;
-
-    // Also update inquiry status
-    await supabase
+    // Update inquiry status to resolved
+    const { error: inqError } = await supabase
       .from("inquiries")
       .update({ status: "resolved" })
       .eq("id", match.inquiry_id);
 
+    if (inqError) throw inqError;
+
     // Update inventory item as claimed
-    await supabase
+    const { error: invError } = await supabase
       .from("inventory")
       .update({ status: "claimed" })
       .eq("id", match.inventory_id);
 
+    if (invError) throw invError;
+
     res.status(200).json({
-      message: "Item claimed successfully",
-      data: updatedMatch,
+      message: "Item claimed successfully! Visit the lost & found office to pick it up.",
+      data: { match_id: id, inquiry_id: match.inquiry_id, inventory_id: match.inventory_id },
     });
   } catch (error) {
     console.error("Error claiming match:", error);
