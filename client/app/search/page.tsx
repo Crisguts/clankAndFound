@@ -120,7 +120,7 @@ export default function SearchPage() {
   return (
     <div className="w-full min-h-screen bg-background">
       <Header />
-      
+
       <main className="max-w-[1200px] mx-auto pt-24 px-4 md:px-6 pb-12">
         {/* Mode Toggle */}
         <ModeToggle mode={mode} onModeChange={handleModeChange} />
@@ -186,12 +186,12 @@ export default function SearchPage() {
                         {mode === "find" ? (
                           <>
                             <Search className="mr-2 h-5 w-5" />
-                            Search with Bean
+                            Submit Item to Bean
                           </>
                         ) : (
                           <>
                             <Upload className="mr-2 h-5 w-5" />
-                            Report Found Item
+                            Submit Found Item to Bean
                           </>
                         )}
                       </>

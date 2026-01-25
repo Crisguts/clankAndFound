@@ -41,20 +41,20 @@ export default function SplineScene() {
 
             {/* Spline Scene with color tint overlay */}
             {!hasError && (
-                <div className="relative w-full h-full spline-themed">
+                <div className="relative w-full h-full spline-themed overflow-hidden">
                     <Suspense fallback={null}>
-                        <Spline
-                            scene="https://prod.spline.design/l8gr6AhxxCqDIdBx/scene.splinecode"
-                            onLoad={handleLoad}
-                            onError={handleError}
-                            style={{
-                                width: "100%",
-                                height: "100%",
-                                background: "transparent",
-                            }}
-                        />
-                        {/* Overlay to hide branding */}
-                        <div className="absolute bottom-0 right-0 w-48 h-16 bg-background z-50 pointer-events-none"></div>
+                        <div className="w-full h-[calc(100%+100px)]">
+                            <Spline
+                                scene="https://prod.spline.design/l8gr6AhxxCqDIdBx/scene.splinecode"
+                                onLoad={handleLoad}
+                                onError={handleError}
+                                style={{
+                                    width: "100%",
+                                    height: "100%",
+                                    background: "transparent",
+                                }}
+                            />
+                        </div>
                     </Suspense>
                 </div>
             )}

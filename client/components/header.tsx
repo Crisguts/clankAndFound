@@ -17,15 +17,14 @@ export default function Header() {
           <ThemeToggle />
           <Link href="/sign-in">
             <Button
-              variant="outline"
-              className="rounded-full px-5 border-border hover:border-primary hover:text-primary transition-all duration-300 bg-transparent hidden sm:flex"
+              className="bg-primary text-primary-foreground rounded-full px-6 w-28 justify-center transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_var(--primary)] hidden sm:flex"
             >
               Sign In
             </Button>
           </Link>
           <Link href="/sign-up">
             <Button
-              className="bg-primary text-primary-foreground rounded-full px-6 transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_rgba(29,237,131,0.5)]"
+              className="bg-primary text-primary-foreground rounded-full px-6 w-28 justify-center transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_var(--primary)]"
             >
               <span className="hidden sm:inline">Sign Up</span>
               <User className="h-4 w-4 sm:hidden" />

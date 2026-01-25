@@ -7,6 +7,9 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, Eye, EyeOff } from "lucide-react"
 
+import { ThemeToggle } from "@/components/theme-toggle"
+import { PaletteToggle } from "@/components/palette-toggle"
+
 export default function SignUpPage() {
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
@@ -33,11 +36,15 @@ export default function SignUpPage() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
-      <header className="px-6 py-4">
+      <header className="px-6 py-4 flex items-center justify-between">
         <Link href="/" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
           <ArrowLeft className="h-4 w-4" />
           <span className="font-sans text-sm">Back to Home</span>
         </Link>
+        <div className="flex items-center gap-3">
+          <PaletteToggle />
+          <ThemeToggle />
+        </div>
       </header>
 
       {/* Main Content */}
@@ -49,14 +56,14 @@ export default function SignUpPage() {
               <div className="bg-surface-3 rounded-[1.25rem] border border-border-raised p-8">
                 {/* Logo/Character */}
                 <div className="flex justify-center mb-6">
-                  <img 
-                    src="/jack-front.png" 
-                    alt="Bean" 
+                  <img
+                    src="/jack-front.png"
+                    alt="Bean"
                     className="w-20 h-20 object-contain themed-image"
                   />
                 </div>
 
-                <h1 
+                <h1
                   className="text-foreground text-2xl font-semibold text-center mb-2"
                   style={{ fontFamily: "var(--font-geist-sans)" }}
                 >
