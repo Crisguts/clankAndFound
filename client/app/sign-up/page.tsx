@@ -1,15 +1,13 @@
 "use client"
 
 import React from "react"
+
 import { useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, Eye, EyeOff } from "lucide-react"
-import { supabase } from "@/lib/supabase"
-import { useRouter } from "next/navigation"
 
 export default function SignUpPage() {
-  const router = useRouter()
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -17,46 +15,19 @@ export default function SignUpPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError(null)
-
     if (password !== confirmPassword) {
-      setError("Passwords do not match")
+      alert("Passwords do not match")
       return
     }
-
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters")
-      return
-    }
-
     setIsLoading(true)
-
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: name,
-          },
-        },
-      })
-
-      if (error) throw error
-
-      if (data.user) {
-        alert("Sign up successful! Please check your email for verification.")
-        router.push("/sign-in")
-      }
-    } catch (err: any) {
-      setError(err.message || "An error occurred during sign up")
-    } finally {
+    // Placeholder for auth logic
+    setTimeout(() => {
       setIsLoading(false)
-    }
+      alert("Sign up functionality will be implemented with authentication")
+    }, 1000)
   }
 
   return (
@@ -78,14 +49,14 @@ export default function SignUpPage() {
               <div className="bg-surface-3 rounded-[1.25rem] border border-border-raised p-8">
                 {/* Logo/Character */}
                 <div className="flex justify-center mb-6">
-                  <img
-                    src="/jack-front.png"
-                    alt="Bean"
+                  <img 
+                    src="/jack-front.png" 
+                    alt="Bean" 
                     className="w-20 h-20 object-contain themed-image"
                   />
                 </div>
 
-                <h1
+                <h1 
                   className="text-foreground text-2xl font-semibold text-center mb-2"
                   style={{ fontFamily: "var(--font-geist-sans)" }}
                 >
@@ -96,11 +67,6 @@ export default function SignUpPage() {
                 </p>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
-                  {error && (
-                    <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm p-3 rounded-xl text-center">
-                      {error}
-                    </div>
-                  )}
                   <div>
                     <label className="block text-accent text-sm font-sans mb-2">
                       Full Name
