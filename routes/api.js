@@ -517,4 +517,48 @@ router.get("/inquiries", async (req, res) => {
   }
 });
 
+// GET /api/inquiry/:id - Get single inquiry details
+router.get("/inquiry/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Validate UUID format
+    if (!id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+      return res.status(400).json({ error: "Invalid inquiry ID format" });
+    }
+
+    // Fetch inquiry
+    const { data: inquiry, error: inquiryError } = await supabase
+      .from('inquiries')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (inquiryError || !inquiry) {
+      return res.status(404).json({ error: "Inquiry not found" });
+    }
+
+    // Fetch associated matches with inventory details
+    const { data: matches, error: matchesError } = await supabase
+      .from('matches')
+      .select(`
+        *,
+        inventory:inventory(*)
+      `)
+      .eq('inquiry_id', id)
+      .order('score', { ascending: false });
+
+    if (matchesError) throw matchesError;
+
+    res.status(200).json({
+      message: "Inquiry retrieved successfully",
+      data: inquiry,
+      matches: matches || []
+    });
+  } catch (error) {
+    console.error("Error fetching inquiry:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
