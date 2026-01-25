@@ -5,6 +5,7 @@ import Footer from "@/components/footer"
 import HeroTextOverlay from "@/components/hero-text-overlay"
 import Link from "next/link"
 import { Search, MessageSquare, ImagePlusIcon as ImageLucideIcon, Sparkles } from "lucide-react"
+import { Button } from "@/components/ui/button"
 
 export default function Home() {
   return (
@@ -72,12 +73,12 @@ export default function Home() {
                       </div>
                     </div>
 
-                    <Link href="/search">
-                      <button className="bg-primary text-primary-foreground px-8 py-4 rounded-full font-semibold text-lg whitespace-nowrap hover:scale-105 hover:shadow-[0_0_20px_rgba(29,237,131,0.5)] transition-all duration-300 font-sans flex items-center gap-2">
+                    <Button asChild className="bg-primary text-primary-foreground px-8 py-4 rounded-full font-semibold text-lg whitespace-nowrap hover:scale-105 hover:shadow-[0_0_20px_rgba(29,237,131,0.5)] transition-all duration-300 font-sans flex items-center gap-2">
+                      <Link href="/search">
                         <Search className="h-5 w-5" />
                         Start Searching
-                      </button>
-                    </Link>
+                      </Link>
+                    </Button>
                   </div>
 
                   {/* Right illustration */}

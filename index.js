@@ -18,7 +18,7 @@ const upload = multer({ storage: multer.memoryStorage() });
 app.set("upload", upload);
 
 // Serve static files from React build
-app.use(express.static(path.join(__dirname, 'client/out')));
+app.use(express.static(path.join(__dirname, 'client/out'), { extensions: ['html'] }));
 
 // API routes
 const apiRoutes = require('./routes/api');
