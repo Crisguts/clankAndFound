@@ -54,7 +54,7 @@ export default function Header() {
               <Button
                 onClick={handleSignOut}
                 variant="outline"
-                className="rounded-full px-4 border-border hover:border-destructive hover:text-destructive transition-all duration-300 bg-transparent flex items-center gap-2"
+                className="rounded-full px-4 border-border hover:bg-destructive hover:text-destructive-foreground hover:border-destructive transition-all duration-300 bg-transparent flex items-center gap-2"
               >
                 <LogOut className="h-4 w-4" />
                 <span className="hidden sm:inline">Sign Out</span>
