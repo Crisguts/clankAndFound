@@ -13,10 +13,12 @@ export default function SignInPage() {
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
+    setError(null)
 
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -30,7 +32,7 @@ export default function SignInPage() {
         window.location.href = "/"
       }
     } catch (error: any) {
-      alert(error.message || "An error occurred during sign in")
+      setError(error.message || "An error occurred during sign in")
     } finally {
       setIsLoading(false)
     }
@@ -109,6 +111,12 @@ export default function SignInPage() {
                       </button>
                     </div>
                   </div>
+
+                  {error && (
+                    <div className="bg-destructive/10 border border-destructive/20 text-destructive text-xs py-3 px-4 rounded-lg font-sans">
+                      {error}
+                    </div>
+                  )}
 
                   <div className="flex justify-end">
                     <Link href="/forgot-password" className="text-primary text-sm font-sans hover:underline">
