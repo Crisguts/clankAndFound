@@ -6,6 +6,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, Eye, EyeOff } from "lucide-react"
+import { supabase } from "@/lib/supabase"
 
 export default function SignInPage() {
   const [email, setEmail] = useState("")
@@ -16,11 +17,23 @@ export default function SignInPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
-    // Placeholder for auth logic
-    setTimeout(() => {
+
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+
+      if (error) throw error
+
+      if (data.user) {
+        window.location.href = "/"
+      }
+    } catch (error: any) {
+      alert(error.message || "An error occurred during sign in")
+    } finally {
       setIsLoading(false)
-      alert("Sign in functionality will be implemented with authentication")
-    }, 1000)
+    }
   }
 
   return (
@@ -42,14 +55,14 @@ export default function SignInPage() {
               <div className="bg-surface-3 rounded-[1.25rem] border border-border-raised p-8">
                 {/* Logo/Character */}
                 <div className="flex justify-center mb-6">
-                  <img 
-                    src="/jack-front.png" 
-                    alt="Bean" 
+                  <img
+                    src="/jack-front.png"
+                    alt="Bean"
                     className="w-20 h-20 object-contain themed-image"
                   />
                 </div>
 
-                <h1 
+                <h1
                   className="text-foreground text-2xl font-semibold text-center mb-2"
                   style={{ fontFamily: "var(--font-geist-sans)" }}
                 >

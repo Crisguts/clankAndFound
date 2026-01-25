@@ -6,6 +6,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, Eye, EyeOff } from "lucide-react"
+import { supabase } from "@/lib/supabase"
 
 export default function SignUpPage() {
   const [name, setName] = useState("")
@@ -23,11 +24,29 @@ export default function SignUpPage() {
       return
     }
     setIsLoading(true)
-    // Placeholder for auth logic
-    setTimeout(() => {
+
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: name,
+          }
+        }
+      })
+
+      if (error) throw error
+
+      if (data.user) {
+        alert("Sign up successful! Please check your email for verification.")
+        window.location.href = "/"
+      }
+    } catch (error: any) {
+      alert(error.message || "An error occurred during sign up")
+    } finally {
       setIsLoading(false)
-      alert("Sign up functionality will be implemented with authentication")
-    }, 1000)
+    }
   }
 
   return (
@@ -49,14 +68,14 @@ export default function SignUpPage() {
               <div className="bg-surface-3 rounded-[1.25rem] border border-border-raised p-8">
                 {/* Logo/Character */}
                 <div className="flex justify-center mb-6">
-                  <img 
-                    src="/jack-front.png" 
-                    alt="Bean" 
+                  <img
+                    src="/jack-front.png"
+                    alt="Bean"
                     className="w-20 h-20 object-contain themed-image"
                   />
                 </div>
 
-                <h1 
+                <h1
                   className="text-foreground text-2xl font-semibold text-center mb-2"
                   style={{ fontFamily: "var(--font-geist-sans)" }}
                 >
