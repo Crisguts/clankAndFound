@@ -162,6 +162,169 @@ router.post("/inventory", upload.single("image"), async (req, res) => {
   }
 });
 
+// GET /api/inventory - Browse and search inventory
+router.get("/inventory", async (req, res) => {
+  try {
+    const { search, status = 'active', limit = 50, offset = 0 } = req.query;
+
+    if (search) {
+      // Use full-text search RPC function
+      const { data, error } = await supabase.rpc('match_inventory', {
+        query_text: search,
+        match_threshold: 0.01, // Low threshold to return more results
+        match_count: parseInt(limit)
+      });
+
+      if (error) throw error;
+
+      // Filter by status if provided
+      const filteredData = status ? data.filter(item => item.status === status) : data;
+
+      res.status(200).json({
+        message: "Inventory items retrieved successfully",
+        data: filteredData || [],
+        count: filteredData.length
+      });
+    } else {
+      // Regular browse with pagination
+      const { data, error, count } = await supabase
+        .from('inventory')
+        .select('*', { count: 'exact' })
+        .eq('status', status)
+        .order('created_at', { ascending: false })
+        .range(parseInt(offset), parseInt(offset) + parseInt(limit) - 1);
+
+      if (error) throw error;
+
+      res.status(200).json({
+        message: "Inventory items retrieved successfully",
+        data: data || [],
+        count: count || 0
+      });
+    }
+  } catch (error) {
+    console.error("Error fetching inventory:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// PATCH /api/inventory/:id - Edit inventory item
+router.patch("/inventory/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { description, status, location_found } = req.body;
+
+    // Validate UUID format
+    if (!id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+      return res.status(400).json({ error: "Invalid inventory ID format" });
+    }
+
+    // Validate status if provided
+    if (status && !['active', 'claimed', 'archived'].includes(status)) {
+      return res.status(400).json({
+        error: "Invalid status. Must be 'active', 'claimed', or 'archived'"
+      });
+    }
+
+    // Build update object
+    const updateData = {};
+    if (description !== undefined) updateData.description = description;
+    if (status !== undefined) updateData.status = status;
+    if (location_found !== undefined) updateData.location_found = location_found;
+
+    // Check if there's anything to update
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({ error: "No fields to update" });
+    }
+
+    // Fetch current item to verify it exists
+    const { data: item, error: fetchError } = await supabase
+      .from('inventory')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !item) {
+      return res.status(404).json({ error: "Inventory item not found" });
+    }
+
+    // Update item
+    const { data: updatedItem, error: updateError } = await supabase
+      .from('inventory')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (updateError) throw updateError;
+
+    res.status(200).json({
+      message: "Inventory item updated successfully",
+      data: updatedItem
+    });
+  } catch (error) {
+    console.error("Error updating inventory item:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DELETE /api/inventory/:id - Delete or archive item
+router.delete("/inventory/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { permanent = false } = req.query;
+
+    // Validate UUID format
+    if (!id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+      return res.status(400).json({ error: "Invalid inventory ID format" });
+    }
+
+    // Check if item exists
+    const { data: item, error: fetchError } = await supabase
+      .from('inventory')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !item) {
+      return res.status(404).json({ error: "Inventory item not found" });
+    }
+
+    if (permanent === 'true' || permanent === true) {
+      // Hard delete
+      const { error: deleteError } = await supabase
+        .from('inventory')
+        .delete()
+        .eq('id', id);
+
+      if (deleteError) throw deleteError;
+
+      res.status(200).json({
+        message: "Inventory item permanently deleted",
+        data: { id, deleted: true }
+      });
+    } else {
+      // Soft delete (archive)
+      const { data: archivedItem, error: updateError } = await supabase
+        .from('inventory')
+        .update({ status: 'archived' })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (updateError) throw updateError;
+
+      res.status(200).json({
+        message: "Inventory item archived successfully",
+        data: archivedItem
+      });
+    }
+  } catch (error) {
+    console.error("Error deleting inventory item:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // GET /api/matches - List all matches (for assistant review)
 router.get("/matches", async (req, res) => {
   try {
