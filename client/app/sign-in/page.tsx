@@ -17,11 +17,24 @@ export default function SignInPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [validationErrors, setValidationErrors] = useState<{ email?: string; password?: string }>({})
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    // Custom Validation
+    const errors: { email?: string; password?: string } = {}
+    if (!email.trim()) errors.email = "Please fill out this field."
+    if (!password) errors.password = "Please fill out this field."
+
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors)
+      return
+    }
+
     setIsLoading(true)
     setError(null)
+    setValidationErrors({})
 
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -101,11 +114,22 @@ export default function SignInPage() {
                     <input
                       type="email"
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      onChange={(e) => {
+                        setEmail(e.target.value)
+                        if (validationErrors.email) setValidationErrors(prev => ({ ...prev, email: undefined }))
+                      }}
                       placeholder="you@example.com"
-                      className="w-full bg-surface-2 border border-border-raised rounded-xl py-3 px-4 text-foreground placeholder:text-muted-foreground font-sans focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
-                      required
+                      className={`w-full bg-surface-2 border rounded-xl py-3 px-4 text-foreground placeholder:text-muted-foreground font-sans focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all ${validationErrors.email ? "border-destructive focus:border-destructive focus:ring-destructive/50" : "border-border-raised"
+                        }`}
                     />
+                    {validationErrors.email && (
+                      <div className="absolute mt-1 bg-surface-2 text-foreground text-xs py-2 px-3 rounded-md border border-border-raised shadow-lg flex items-center gap-2 z-10 animate-in fade-in zoom-in-95 duration-200">
+                        <div className="bg-orange-500 rounded-sm p-0.5">
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3 text-white"><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                        </div>
+                        {validationErrors.email}
+                      </div>
+                    )}
                   </div>
 
                   <div>
@@ -116,11 +140,22 @@ export default function SignInPage() {
                       <input
                         type={showPassword ? "text" : "password"}
                         value={password}
-                        onChange={(e) => setPassword(e.target.value)}
+                        onChange={(e) => {
+                          setPassword(e.target.value)
+                          if (validationErrors.password) setValidationErrors(prev => ({ ...prev, password: undefined }))
+                        }}
                         placeholder="Enter your password"
-                        className="w-full bg-surface-2 border border-border-raised rounded-xl py-3 px-4 pr-12 text-foreground placeholder:text-muted-foreground font-sans focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
-                        required
+                        className={`w-full bg-surface-2 border rounded-xl py-3 px-4 pr-12 text-foreground placeholder:text-muted-foreground font-sans focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all ${validationErrors.password ? "border-destructive focus:border-destructive focus:ring-destructive/50" : "border-border-raised"
+                          }`}
                       />
+                      {validationErrors.password && (
+                        <div className="absolute mt-1 top-full bg-surface-2 text-foreground text-xs py-2 px-3 rounded-md border border-border-raised shadow-lg flex items-center gap-2 z-10 animate-in fade-in zoom-in-95 duration-200">
+                          <div className="bg-orange-500 rounded-sm p-0.5">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3 text-white"><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                          </div>
+                          {validationErrors.password}
+                        </div>
+                      )}
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
@@ -146,7 +181,7 @@ export default function SignInPage() {
                   <Button
                     type="submit"
                     disabled={isLoading}
-                    className="w-full bg-primary text-primary-foreground rounded-full py-6 font-semibold transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_rgba(29,237,131,0.5)] disabled:opacity-50"
+                    className="w-full bg-primary text-primary-foreground rounded-full py-6 font-semibold transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_var(--primary)] disabled:opacity-50"
                   >
                     {isLoading ? "Signing in..." : "Sign In"}
                   </Button>

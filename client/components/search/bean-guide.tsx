@@ -92,7 +92,7 @@ export function BeanGuide({ state, isSearching, mode }: BeanGuideProps) {
   return (
     <div className="flex flex-col items-center gap-4">
       {/* Bean Character */}
-      <div className={`relative transition-all duration-500 w-[350px] h-[330px] ${isSearching ? "animate-bounce" : ""}`}>
+      <div className={`relative transition-all duration-500 w-[350px] h-[330px] ${isSearching ? "animate-gentle-float" : ""}`}>
         <SplineScene className="bg-transparent" />
         {/* Glow effect when searching */}
         {isSearching && (
@@ -136,7 +136,7 @@ function StateIndicatorPill({ label, active }: { label: string; active: boolean 
   return (
     <span
       className={`px-3 py-1 rounded-full text-xs font-sans transition-all duration-300 ${active
-        ? "bg-surface-3 text-primary border border-primary/50 shadow-[0_0_10px_rgba(29,237,131,0.2)]"
+        ? "bg-surface-3 text-primary border border-primary/50 shadow-[0_0_10px_var(--primary)]"
         : "bg-surface-1 text-muted-foreground border border-border"
         }`}
     >

@@ -80,6 +80,7 @@ export default function AdminPage() {
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null)
   const [stats, setStats] = useState<any>(null)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+  const [validationErrors, setValidationErrors] = useState<{ image?: string; description?: string; location?: string }>({})
 
   // Check auth and role
   useEffect(() => {
@@ -685,12 +686,31 @@ export default function AdminPage() {
                 e.preventDefault()
                 const form = e.currentTarget
                 const formData = new FormData(form)
+                const imageFile = formData.get("image") as File;
+
+                if (!imageFile || imageFile.size === 0) {
+                  setValidationErrors({ image: "Please upload an image." })
+                  return
+                }
+
+                setValidationErrors({})
                 await handleAddItem(formData)
               }}>
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium mb-2">Item Image *</label>
-                    <input type="file" name="image" accept="image/*" required className="w-full bg-surface-3 border border-border-raised rounded-lg p-3 text-sm" />
+                    <input
+                      type="file"
+                      name="image"
+                      accept="image/*"
+                      className={`w-full bg-surface-3 border rounded-lg p-3 text-sm ${validationErrors.image ? "border-destructive ring-1 ring-destructive" : "border-border-raised"}`}
+                      onChange={() => setValidationErrors(prev => ({ ...prev, image: undefined }))}
+                    />
+                    {validationErrors.image && (
+                      <div className="mt-1 text-destructive text-xs flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" /> {validationErrors.image}
+                      </div>
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-2">Location Found</label>
@@ -704,7 +724,8 @@ export default function AdminPage() {
               </form>
             </div>
           </div>
-        )}
+        )
+        }
 
         {/* Edit Item Modal */}
         {editingItem && (
@@ -720,8 +741,16 @@ export default function AdminPage() {
                 e.preventDefault()
                 const form = e.currentTarget
                 const formData = new FormData(form)
+
+                const description = formData.get("description") as string;
+                if (!description.trim()) {
+                  setValidationErrors({ description: "Please enter a description." })
+                  return
+                }
+
+                setValidationErrors({})
                 await handleEditItem(editingItem.id, {
-                  description: formData.get("description") as string,
+                  description: description,
                   location_found: formData.get("location_found") as string,
                   status: formData.get("status") as ItemStatus,
                 })
@@ -732,7 +761,18 @@ export default function AdminPage() {
                   )}
                   <div>
                     <label className="block text-sm font-medium mb-2">Description</label>
-                    <textarea name="description" defaultValue={editingItem.description} rows={3} className="w-full bg-surface-3 border border-border-raised rounded-lg p-3 text-sm" />
+                    <textarea
+                      name="description"
+                      defaultValue={editingItem.description}
+                      rows={3}
+                      className={`w-full bg-surface-3 border rounded-lg p-3 text-sm ${validationErrors.description ? "border-destructive ring-1 ring-destructive" : "border-border-raised"}`}
+                      onChange={() => setValidationErrors(prev => ({ ...prev, description: undefined }))}
+                    />
+                    {validationErrors.description && (
+                      <div className="mt-1 text-destructive text-xs flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" /> {validationErrors.description}
+                      </div>
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-2">Location Found</label>
@@ -758,49 +798,51 @@ export default function AdminPage() {
       </main>
 
       {/* Delete Confirmation Modal */}
-      {deleteConfirmId && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
-          onClick={() => setDeleteConfirmId(null)}
-        >
+      {
+        deleteConfirmId && (
           <div
-            className="bg-surface-1 rounded-2xl p-1 shadow-2xl max-w-md w-full mx-4 animate-in fade-in zoom-in duration-200"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+            onClick={() => setDeleteConfirmId(null)}
           >
-            <div className="bg-surface-2 rounded-xl p-1 border border-border">
-              <div className="bg-surface-3 rounded-lg p-6 border border-border-raised">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="bg-destructive/10 p-3 rounded-full">
-                    <AlertCircle className="h-6 w-6 text-destructive" />
+            <div
+              className="bg-surface-1 rounded-2xl p-1 shadow-2xl max-w-md w-full mx-4 animate-in fade-in zoom-in duration-200"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="bg-surface-2 rounded-xl p-1 border border-border">
+                <div className="bg-surface-3 rounded-lg p-6 border border-border-raised">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="bg-destructive/10 p-3 rounded-full">
+                      <AlertCircle className="h-6 w-6 text-destructive" />
+                    </div>
+                    <h3 className="text-xl font-semibold text-foreground" style={{ fontFamily: "var(--font-geist-sans)" }}>
+                      Delete Item?
+                    </h3>
                   </div>
-                  <h3 className="text-xl font-semibold text-foreground" style={{ fontFamily: "var(--font-geist-sans)" }}>
-                    Delete Item?
-                  </h3>
-                </div>
-                <p className="text-muted-foreground font-sans text-sm mb-6">
-                  Are you sure you want to delete this item? This action cannot be undone.
-                </p>
-                <div className="flex gap-3">
-                  <Button
-                    variant="outline"
-                    onClick={() => setDeleteConfirmId(null)}
-                    className="flex-1 rounded-full border-border text-foreground hover:bg-primary/10 hover:border-primary hover:text-primary transition-colors"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={confirmDelete}
-                    className="flex-1 rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/80 hover:scale-105 transition-all duration-200"
-                  >
-                    Yes, Delete
-                  </Button>
+                  <p className="text-muted-foreground font-sans text-sm mb-6">
+                    Are you sure you want to delete this item? This action cannot be undone.
+                  </p>
+                  <div className="flex gap-3">
+                    <Button
+                      variant="outline"
+                      onClick={() => setDeleteConfirmId(null)}
+                      className="flex-1 rounded-full border-border text-foreground hover:bg-primary/10 hover:border-primary hover:text-primary transition-colors"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={confirmDelete}
+                      className="flex-1 rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/80 hover:scale-105 transition-all duration-200"
+                    >
+                      Yes, Delete
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )
+      }
+    </div >
   )
 }
 
