@@ -944,4 +944,117 @@ router.get("/matches/:id/questions", verifyToken, requireAssistant, async (req, 
   }
 });
 
+// ============================================
+// USER PROFILE ENDPOINTS (/my/*)
+// ============================================
+
+// GET /my/inquiries - Get user's own inquiries
+router.get("/my/inquiries", verifyToken, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("inquiries")
+      .select("*")
+      .eq("user_id", req.user.id)
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    res.status(200).json({ data });
+  } catch (error) {
+    console.error("Error fetching user inquiries:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /my/matches - Get confirmed matches for user's inquiries
+router.get("/my/matches", verifyToken, async (req, res) => {
+  try {
+    // First get user's inquiry IDs
+    const { data: inquiries, error: inqError } = await supabase
+      .from("inquiries")
+      .select("id")
+      .eq("user_id", req.user.id);
+
+    if (inqError) throw inqError;
+
+    const inquiryIds = inquiries.map((i) => i.id);
+
+    if (inquiryIds.length === 0) {
+      return res.status(200).json({ data: [] });
+    }
+
+    // Get confirmed matches for those inquiries
+    const { data: matches, error: matchError } = await supabase
+      .from("matches")
+      .select(`
+        *,
+        inquiry:inquiries(id, description, image_url, created_at),
+        inventory:inventory(id, description, image_url, location_found)
+      `)
+      .in("inquiry_id", inquiryIds)
+      .eq("status", "confirmed")
+      .order("created_at", { ascending: false });
+
+    if (matchError) throw matchError;
+
+    res.status(200).json({ data: matches });
+  } catch (error) {
+    console.error("Error fetching user matches:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// PATCH /my/matches/:id/claim - User claims the matched item
+router.patch("/my/matches/:id/claim", verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Verify match belongs to user's inquiry
+    const { data: match, error: fetchError } = await supabase
+      .from("matches")
+      .select(`*, inquiry:inquiries(user_id)`)
+      .eq("id", id)
+      .single();
+
+    if (fetchError || !match) {
+      return res.status(404).json({ error: "Match not found" });
+    }
+
+    if (match.inquiry.user_id !== req.user.id) {
+      return res.status(403).json({ error: "Not authorized to claim this match" });
+    }
+
+    // Update match to claimed
+    const { data: updatedMatch, error: updateError } = await supabase
+      .from("matches")
+      .update({ status: "claimed" })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (updateError) throw updateError;
+
+    // Also update inquiry status
+    await supabase
+      .from("inquiries")
+      .update({ status: "resolved" })
+      .eq("id", match.inquiry_id);
+
+    // Update inventory item as claimed
+    await supabase
+      .from("inventory")
+      .update({ status: "claimed" })
+      .eq("id", match.inventory_id);
+
+    res.status(200).json({
+      message: "Item claimed successfully",
+      data: updatedMatch,
+    });
+  } catch (error) {
+    console.error("Error claiming match:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
+
