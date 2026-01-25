@@ -68,4 +68,38 @@ async function verifyMatch(inquiryText, inventoryText) {
   return JSON.parse(cleanedText);
 }
 
-module.exports = { analyzeImage, verifyMatch };
+// 3. Generate Follow-up Questions for Match Refinement
+async function generateMatchQuestions(inquiryText, inventoryText) {
+  const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+
+  const prompt = `
+    Compare these two item descriptions.
+    
+    Item A (Lost): "${inquiryText}"
+    Item B (Found): "${inventoryText}"
+    
+    Generate 1-3 discrimination questions that an assistant could ask the person who lost Item A to confirm if Item B is theirs.
+    The questions should focus on details that might be visible in Item B but were not mentioned in Item A.
+    
+    Return a detailed JSON object:
+    {
+      "questions": [
+        "Question 1?",
+        "Question 2?"
+      ]
+    }
+  `;
+
+  const result = await model.generateContent(prompt);
+  const response = await result.response;
+  const text = response.text();
+
+  const cleanedText = text
+    .replace(/```json/g, "")
+    .replace(/```/g, "")
+    .trim();
+
+  return JSON.parse(cleanedText);
+}
+
+module.exports = { analyzeImage, verifyMatch, generateMatchQuestions };

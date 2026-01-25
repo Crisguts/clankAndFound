@@ -13,15 +13,17 @@ router.post("/data", (req, res) => {
 });
 
 const multer = require("multer");
-const { analyzeImage } = require("../services/gemini");
+const { analyzeImage, generateMatchQuestions } = require("../services/gemini");
 const supabase = require("../services/supabase");
 const { findMatchesForInquiry } = require("../services/matching");
 
 // Configure Multer (Memory Storage)
 const upload = multer({ storage: multer.memoryStorage() });
 
+const rateLimit = require("../middleware/rateLimit");
+
 // POST /inquiry - User submits a lost item
-router.post("/inquiry", upload.single("image"), async (req, res) => {
+router.post("/inquiry", rateLimit, upload.single("image"), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: "Image is required" });
@@ -830,6 +832,52 @@ router.get("/stats", async (req, res) => {
     });
   } catch (error) {
     console.error("Error fetching stats:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/matches/:id/questions - Generate follow-up questions
+router.get("/matches/:id/questions", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Validate UUID
+    if (
+      !id.match(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+      )
+    ) {
+      return res.status(400).json({ error: "Invalid match ID format" });
+    }
+
+    // Fetch match with related inquiry and inventory descriptions
+    const { data: match, error: fetchError } = await supabase
+      .from("matches")
+      .select(
+        `
+        *,
+        inquiry:inquiries(description),
+        inventory:inventory(description)
+      `,
+      )
+      .eq("id", id)
+      .single();
+
+    if (fetchError || !match) {
+      return res.status(404).json({ error: "Match not found" });
+    }
+
+    const { questions } = await generateMatchQuestions(
+      match.inquiry.description,
+      match.inventory.description,
+    );
+
+    res.status(200).json({
+      message: "Questions generated successfully",
+      questions,
+    });
+  } catch (error) {
+    console.error("Error generating match questions:", error);
     res.status(500).json({ error: error.message });
   }
 });
