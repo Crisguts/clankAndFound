@@ -4,7 +4,8 @@ import React from "react"
 import { useState, useCallback, useEffect } from "react"
 import Header from "@/components/header"
 import { Button } from "@/components/ui/button"
-import { Package, CheckCircle, Clock, AlertCircle, X, MapPin } from "lucide-react"
+import { Package, CheckCircle, Clock, AlertCircle, X, MapPin, MessageSquare, ChevronRight } from "lucide-react"
+import { useToast } from "@/components/ui/use-toast"
 import { supabase } from "@/lib/supabase"
 import Link from "next/link"
 
@@ -16,6 +17,11 @@ interface Inquiry {
     image_url: string | null
     status: string
     created_at: string
+    match_count?: number
+    refinement?: {
+        token: string
+        question_count: number
+    } | null
 }
 
 interface Match {
@@ -37,6 +43,7 @@ interface Match {
 }
 
 export default function ProfilePage() {
+    const { toast } = useToast()
     const [user, setUser] = useState<any>(null)
     const [inquiries, setInquiries] = useState<Inquiry[]>([])
     const [matches, setMatches] = useState<Match[]>([])
@@ -103,22 +110,37 @@ export default function ProfilePage() {
             if (!res.ok) throw new Error("Failed to claim")
 
             setMatches(prev => prev.filter(m => m.id !== matchId))
-            alert("Item claimed successfully! Please visit the lost & found office to pick it up.")
+            toast({
+                title: "Item Claimed!",
+                description: "Please visit the lost & found office to pick up your item.",
+            })
         } catch (err: any) {
-            setError(err.message)
+            toast({
+                title: "Error",
+                description: err.message || "Failed to claim item",
+                variant: "destructive",
+            })
         }
     }, [])
 
-    const getStatusBadge = (status: string) => {
-        switch (status) {
+    const getStatusBadge = (inq: Inquiry) => {
+        // If there's a pending refinement session, show refinement status
+        if (inq.refinement && inq.match_count && inq.match_count > 5) {
+            return <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-purple-500/20 text-purple-600"><MessageSquare className="h-3 w-3" />Needs Your Input</span>
+        }
+
+        switch (inq.status) {
             case "submitted":
+                if (inq.match_count && inq.match_count > 0) {
+                    return <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-blue-500/20 text-blue-600"><Clock className="h-3 w-3" />{inq.match_count} potential matches</span>
+                }
                 return <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-yellow-500/20 text-yellow-600"><Clock className="h-3 w-3" />Searching</span>
             case "matched":
                 return <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-primary/20 text-primary"><CheckCircle className="h-3 w-3" />Match Found!</span>
             case "resolved":
                 return <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-muted text-muted-foreground"><CheckCircle className="h-3 w-3" />Resolved</span>
             default:
-                return <span className="text-xs">{status}</span>
+                return <span className="text-xs">{inq.status}</span>
         }
     }
 
@@ -257,6 +279,7 @@ export default function ProfilePage() {
                                             <th className="text-left py-3 px-4 font-sans text-xs text-muted-foreground uppercase">Item</th>
                                             <th className="text-left py-3 px-4 font-sans text-xs text-muted-foreground uppercase">Date</th>
                                             <th className="text-left py-3 px-4 font-sans text-xs text-muted-foreground uppercase">Status</th>
+                                            <th className="text-left py-3 px-4 font-sans text-xs text-muted-foreground uppercase">Action</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -269,7 +292,23 @@ export default function ProfilePage() {
                                                     </div>
                                                 </td>
                                                 <td className="py-4 px-4 text-sm text-muted-foreground">{new Date(inq.created_at).toLocaleDateString()}</td>
-                                                <td className="py-4 px-4">{getStatusBadge(inq.status)}</td>
+                                                <td className="py-4 px-4">{getStatusBadge(inq)}</td>
+                                                <td className="py-4 px-4">
+                                                    {inq.refinement && inq.match_count && inq.match_count > 5 ? (
+                                                        <Button asChild size="sm" className="rounded-full bg-purple-600 hover:bg-purple-700 text-white">
+                                                            <Link href={`/refine?token=${inq.refinement.token}`}>
+                                                                Answer Questions
+                                                                <ChevronRight className="ml-1 h-4 w-4" />
+                                                            </Link>
+                                                        </Button>
+                                                    ) : inq.status === "matched" ? (
+                                                        <Button asChild size="sm" variant="outline" className="rounded-full">
+                                                            <Link href="#" onClick={() => setActiveTab("matches")}>
+                                                                View Match
+                                                            </Link>
+                                                        </Button>
+                                                    ) : null}
+                                                </td>
                                             </tr>
                                         ))}
                                     </tbody>

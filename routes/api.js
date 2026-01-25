@@ -28,6 +28,7 @@ const {
   sendUserFoundNotification,
   sendAdminNotification,
 } = require("../services/email");
+const crypto = require("crypto");
 
 // Configure Multer (Memory Storage)
 const upload = multer({ storage: multer.memoryStorage() });
@@ -129,42 +130,67 @@ router.post(
 
       const inquiry = insertData[0];
 
-      // Trigger matching process
+      // Return confirmation immediately
+      res.status(200).json({
+        message: "Inquiry received. We'll get back to you soon!",
+        data: {
+          id: inquiry.id,
+          status: inquiry.status,
+          created_at: inquiry.created_at,
+        },
+      });
+
+      // Run matching and notifications in background (don't await)
       const keywords =
         analysis?.keywords || analysis?.short_description || finalDescription;
 
-      await findMatchesForInquiry(inquiry.id, keywords);
+      (async () => {
+        try {
+          // Trigger matching process
+          await findMatchesForInquiry(inquiry.id, keywords);
 
-      // Fetch the generated matches
-      const { data: matches } = await supabase
-        .from("matches")
-        .select(
-          `
-        *,
-        inventory:inventory(*)
-      `,
-        )
-        .eq("inquiry_id", inquiry.id)
-        .order("score", { ascending: false });
+          // If >5 close matches, create refinement session
+          const { data: closeMatches, count: closeMatchCount } = await supabase
+            .from("matches")
+            .select("*, inventory:inventory(id, description)", { count: "exact" })
+            .eq("inquiry_id", inquiry.id)
+            .gt("score", 0.5)
+            .order("score", { ascending: false })
+            .limit(10);
 
-      // Send admin notification
-      try {
-        await sendAdminNotification({
-          description: finalDescription,
-          inquiry_id: inquiry.id,
-          user_email: req.user?.email || "Anonymous",
-        });
-        console.log("Admin notification sent");
-      } catch (emailErr) {
-        console.error("Failed to send admin notification:", emailErr);
-      }
+          if (closeMatchCount && closeMatchCount > 5) {
+            const candidates = closeMatches.map((m) => ({
+              id: m.inventory?.id,
+              description: m.inventory?.description || "",
+            }));
 
-      res.status(200).json({
-        message: "Inquiry received",
-        data: inquiry,
-        matches: matches || [],
-        analysis,
-      });
+            const { questions } = await generateRefinementQuestions(
+              finalDescription,
+              candidates
+            );
+
+            const token = crypto.randomBytes(32).toString("hex");
+
+            await supabase.from("refinement_sessions").insert({
+              inquiry_id: inquiry.id,
+              token: token,
+              questions: questions,
+              status: "pending",
+            });
+            console.log("Refinement session created for inquiry:", inquiry.id);
+          }
+
+          // Send admin notification
+          await sendAdminNotification({
+            description: finalDescription,
+            inquiry_id: inquiry.id,
+            user_email: req.user?.email || "Anonymous",
+          });
+          console.log("Admin notification sent");
+        } catch (bgError) {
+          console.error("Background processing error:", bgError);
+        }
+      })();
     } catch (error) {
       console.error("Error processing inquiry:", error);
       res.status(500).json({
@@ -1219,10 +1245,10 @@ router.get(
 // USER PROFILE ENDPOINTS (/my/*)
 // ============================================
 
-// GET /my/inquiries - Get user's own inquiries
+// GET /my/inquiries - Get user's own inquiries with match count and refinement info
 router.get("/my/inquiries", verifyToken, async (req, res) => {
   try {
-    const { data, error } = await supabase
+    const { data: inquiries, error } = await supabase
       .from("inquiries")
       .select("*")
       .eq("user_id", req.user.id)
@@ -1230,7 +1256,40 @@ router.get("/my/inquiries", verifyToken, async (req, res) => {
 
     if (error) throw error;
 
-    res.status(200).json({ data });
+    // Enrich each inquiry with match count and refinement session
+    const enrichedInquiries = await Promise.all(
+      (inquiries || []).map(async (inquiry) => {
+        // Get pending match count
+        const { count: matchCount } = await supabase
+          .from("matches")
+          .select("*", { count: "exact", head: true })
+          .eq("inquiry_id", inquiry.id)
+          .eq("status", "pending");
+
+        // Check for pending refinement session
+        const { data: refinementSession } = await supabase
+          .from("refinement_sessions")
+          .select("token, questions")
+          .eq("inquiry_id", inquiry.id)
+          .eq("status", "pending")
+          .single();
+
+        return {
+          ...inquiry,
+          match_count: matchCount || 0,
+          refinement: refinementSession
+            ? {
+                token: refinementSession.token,
+                question_count: Array.isArray(refinementSession.questions)
+                  ? refinementSession.questions.length
+                  : 0,
+              }
+            : null,
+        };
+      })
+    );
+
+    res.status(200).json({ data: enrichedInquiries });
   } catch (error) {
     console.error("Error fetching user inquiries:", error);
     res.status(500).json({ error: error.message });
@@ -1299,6 +1358,14 @@ router.patch("/my/matches/:id/claim", verifyToken, async (req, res) => {
         .json({ error: "Not authorized to claim this match" });
     }
 
+    // Update match status to claimed
+    const { error: matchError } = await supabase
+      .from("matches")
+      .update({ status: "claimed" })
+      .eq("id", id);
+
+    if (matchError) throw matchError;
+
     // Update inquiry status to resolved
     const { error: inqError } = await supabase
       .from("inquiries")
@@ -1326,6 +1393,147 @@ router.patch("/my/matches/:id/claim", verifyToken, async (req, res) => {
     });
   } catch (error) {
     console.error("Error claiming match:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================
+// REFINEMENT ENDPOINTS (/refine/*)
+// Token-based authentication for email links
+// ============================================
+
+// GET /api/refine/:token - Get refinement session by token
+router.get("/refine/:token", async (req, res) => {
+  try {
+    const { token } = req.params;
+
+    const { data: session, error } = await supabase
+      .from("refinement_sessions")
+      .select(
+        `
+        *,
+        inquiry:inquiries(id, description, image_url)
+      `,
+      )
+      .eq("token", token)
+      .eq("status", "pending")
+      .gt("expires_at", new Date().toISOString())
+      .single();
+
+    if (error || !session) {
+      return res.status(404).json({
+        error: "Session not found or expired",
+      });
+    }
+
+    res.status(200).json({
+      message: "Refinement session retrieved",
+      data: {
+        session_id: session.id,
+        inquiry: session.inquiry,
+        questions: session.questions,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching refinement session:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/refine/:token - Submit answers for refinement
+router.post("/refine/:token", async (req, res) => {
+  try {
+    const { token } = req.params;
+    const { answers } = req.body; // [{ question: string, answer: 'yes' | 'no' | 'not_sure' }]
+
+    if (!answers || !Array.isArray(answers)) {
+      return res.status(400).json({ error: "Answers array required" });
+    }
+
+    // Fetch session
+    const { data: session, error: fetchError } = await supabase
+      .from("refinement_sessions")
+      .select("*")
+      .eq("token", token)
+      .eq("status", "pending")
+      .single();
+
+    if (fetchError || !session) {
+      return res
+        .status(404)
+        .json({ error: "Session not found or already answered" });
+    }
+
+    // Update session with answers
+    const { error: updateError } = await supabase
+      .from("refinement_sessions")
+      .update({
+        answers: answers,
+        status: "answered",
+      })
+      .eq("id", session.id);
+
+    if (updateError) throw updateError;
+
+    // Get inquiry description
+    const { data: inquiry } = await supabase
+      .from("inquiries")
+      .select("description")
+      .eq("id", session.inquiry_id)
+      .single();
+
+    // Get pending matches for this inquiry
+    const { data: matches } = await supabase
+      .from("matches")
+      .select(`id, inventory:inventory(id, description)`)
+      .eq("inquiry_id", session.inquiry_id)
+      .eq("status", "pending")
+      .order("score", { ascending: false })
+      .limit(10);
+
+    const candidateItems = matches.map((m) => ({
+      match_id: m.id,
+      id: m.inventory?.id,
+      description: m.inventory?.description || "",
+    }));
+
+    // Use existing refineMatchesWithAnswers to re-score
+    const analysis = await refineMatchesWithAnswers(
+      inquiry.description,
+      answers,
+      candidateItems,
+    );
+
+    // Update match scores in database
+    if (analysis.rethinks) {
+      for (const update of analysis.rethinks) {
+        const match = candidateItems.find((c) => c.id === update.id);
+        if (match) {
+          await supabase
+            .from("matches")
+            .update({
+              score: update.new_score / 100,
+              admin_notes: `User refinement: ${update.reasoning}`,
+            })
+            .eq("id", match.match_id);
+        }
+      }
+    }
+
+    // Check remaining close matches
+    const { count: remainingCloseMatches } = await supabase
+      .from("matches")
+      .select("*", { count: "exact", head: true })
+      .eq("inquiry_id", session.inquiry_id)
+      .gt("score", 0.6);
+
+    res.status(200).json({
+      message: "Answers submitted successfully",
+      remaining_close_matches: remainingCloseMatches || 0,
+      refinement_complete: (remainingCloseMatches || 0) <= 5,
+    });
+  } catch (error) {
+    console.error("Error submitting refinement answers:", error);
     res.status(500).json({ error: error.message });
   }
 });

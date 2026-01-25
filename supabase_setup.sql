@@ -65,16 +65,32 @@ create table matches (
   inquiry_id uuid references inquiries(id) on delete cascade,
   inventory_id uuid references inventory(id) on delete cascade,
   score float, -- Rank score from text search ranking
-  status text check (status in ('pending', 'rejected', 'confirmed')) default 'pending',
+  status text check (status in ('pending', 'rejected', 'confirmed', 'claimed')) default 'pending',
   admin_notes text,
   created_at timestamptz default now()
 );
+
+-- 5. REFINEMENT_SESSIONS (Track follow-up question rounds for narrowing matches)
+create table refinement_sessions (
+  id uuid primary key default gen_random_uuid(),
+  inquiry_id uuid references inquiries(id) on delete cascade,
+  token text unique not null,  -- Unique token for email link authentication
+  questions jsonb not null,    -- Array of {text: string, type: 'yes_no'}
+  answers jsonb,               -- Array of {question: string, answer: 'yes'|'no'|'not_sure'}
+  status text check (status in ('pending', 'answered', 'expired')) default 'pending',
+  expires_at timestamptz default (now() + interval '7 days'),
+  created_at timestamptz default now()
+);
+
+-- Index for fast token lookup
+create index refinement_sessions_token_idx on refinement_sessions(token);
 
 -- Enable RLS
 alter table profiles enable row level security;
 alter table inventory enable row level security;
 alter table inquiries enable row level security;
 alter table matches enable row level security;
+alter table refinement_sessions enable row level security;
 
 -- POLICIES
 
@@ -102,6 +118,16 @@ create policy "Assistants can do everything on matches"
 on matches for all
 using ( exists (select 1 from profiles where id = auth.uid() and role = 'assistant') );
 
+-- Refinement Sessions: Public access via token, user access via inquiry ownership
+create policy "Public can select refinement sessions by token"
+on refinement_sessions for select to public using (true);
+
+create policy "Public can update refinement sessions by token"
+on refinement_sessions for update to public using (true);
+
+create policy "Public can insert refinement sessions"
+on refinement_sessions for insert to public with check (true);
+
 -- Storage
 insert into storage.buckets (id, name, public) values ('images', 'images', true) on conflict (id) do nothing;
 insert into storage.buckets (id, name, public) values ('items', 'items', true) on conflict (id) do nothing;
@@ -119,7 +145,7 @@ create policy "Public Upload Items" on storage.objects for insert to public with
 
 drop policy if exists "Public Read Items" on storage.objects;
 
--- 5. RPC: Match Inventory (with Scoring)
+-- 6. RPC: Match Inventory (with Scoring)
 create or replace function match_inventory(query_text text, match_threshold float default 0.1, match_count int default 10)
 returns table (
   id uuid,
