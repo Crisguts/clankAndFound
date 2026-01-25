@@ -5,17 +5,25 @@ import React from "react"
 import { useState, useCallback } from "react"
 import Header from "@/components/header"
 import { Button } from "@/components/ui/button"
-import { 
-  Search, 
-  Plus, 
-  Pencil, 
-  CheckCircle, 
-  Trash2, 
+import {
+  Search,
+  Plus,
+  Pencil,
+  CheckCircle,
+  Trash2,
   X,
   Package,
   Clock,
   CheckCheck
 } from "lucide-react"
+
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 export type ItemStatus = "active" | "claimed" | "resolved"
 
@@ -84,7 +92,7 @@ export default function AdminPage() {
 
   // Filter inventory based on search and filters
   const filteredInventory = inventory.filter((item) => {
-    const matchesSearch = 
+    const matchesSearch =
       item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.location.toLowerCase().includes(searchQuery.toLowerCase())
@@ -195,29 +203,41 @@ export default function AdminPage() {
               </div>
 
               {/* Status Filter */}
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value as ItemStatus | "all")}
-                className="bg-surface-3 border border-border-raised rounded-lg py-2 px-4 text-foreground font-sans text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-              >
-                <option value="all">All Status</option>
-                <option value="active">Active</option>
-                <option value="claimed">Claimed</option>
-                <option value="resolved">Resolved</option>
-              </select>
+              <div className="w-full md:w-[180px]">
+                <Select
+                  value={filterStatus}
+                  onValueChange={(value) => setFilterStatus(value as ItemStatus | "all")}
+                >
+                  <SelectTrigger className="w-full bg-surface-3 border-border-raised text-foreground font-sans text-sm">
+                    <SelectValue placeholder="All Status" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-surface-3 border-border-raised text-foreground">
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="claimed">Claimed</SelectItem>
+                    <SelectItem value="resolved">Resolved</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
               {/* Category Filter */}
-              <select
-                value={filterCategory}
-                onChange={(e) => setFilterCategory(e.target.value)}
-                className="bg-surface-3 border border-border-raised rounded-lg py-2 px-4 text-foreground font-sans text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-              >
-                {categories.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}
-                  </option>
-                ))}
-              </select>
+              <div className="w-full md:w-[180px]">
+                <Select
+                  value={filterCategory}
+                  onValueChange={setFilterCategory}
+                >
+                  <SelectTrigger className="w-full bg-surface-3 border-border-raised text-foreground font-sans text-sm">
+                    <SelectValue placeholder="All Categories" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-surface-3 border-border-raised text-foreground">
+                    {categories.map((cat) => (
+                      <SelectItem key={cat} value={cat}>
+                        {cat}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
               {/* Add Button */}
               <Button
@@ -338,7 +358,7 @@ export default function AdminPage() {
 function StatCard({ label, value, color }: { label: string; value: number; color?: string }) {
   const bgClass = color === "primary" ? "bg-primary/10" : color === "yellow" ? "bg-yellow-500/10" : "bg-surface-3"
   const textClass = color === "primary" ? "text-primary" : color === "yellow" ? "text-yellow-600" : "text-foreground"
-  
+
   return (
     <div className="bg-surface-1 rounded-xl p-1">
       <div className={`${bgClass} rounded-lg p-4 border border-border`}>
@@ -419,30 +439,38 @@ function ItemModal({ item, onSave, onClose }: ItemModalProps) {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-sans text-muted-foreground mb-1">Category</label>
-                <select
+                <Select
                   value={formData.category}
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                  className="w-full bg-surface-3 border border-border-raised rounded-lg py-2 px-3 text-foreground font-sans text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  onValueChange={(value) => setFormData({ ...formData, category: value })}
                 >
-                  {categories.slice(1).map((cat) => (
-                    <option key={cat} value={cat}>
-                      {cat}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="w-full bg-surface-3 border-border-raised text-foreground font-sans text-sm">
+                    <SelectValue placeholder="Select Category" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-surface-3 border-border-raised text-foreground">
+                    {categories.slice(1).map((cat) => (
+                      <SelectItem key={cat} value={cat}>
+                        {cat}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div>
                 <label className="block text-sm font-sans text-muted-foreground mb-1">Status</label>
-                <select
+                <Select
                   value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value as ItemStatus })}
-                  className="w-full bg-surface-3 border border-border-raised rounded-lg py-2 px-3 text-foreground font-sans text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  onValueChange={(value) => setFormData({ ...formData, status: value as ItemStatus })}
                 >
-                  <option value="active">Active</option>
-                  <option value="claimed">Claimed</option>
-                  <option value="resolved">Resolved</option>
-                </select>
+                  <SelectTrigger className="w-full bg-surface-3 border-border-raised text-foreground font-sans text-sm">
+                    <SelectValue placeholder="Select Status" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-surface-3 border-border-raised text-foreground">
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="claimed">Claimed</SelectItem>
+                    <SelectItem value="resolved">Resolved</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 

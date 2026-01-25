@@ -237,22 +237,19 @@ export default function SearchPage() {
               <BeanGuide state={searchState} isSearching={isSearching} mode={mode} />
             </div>
 
-            {/* Search Interface */}
-            <div className="max-w-3xl mx-auto">
-              {/* Outer container - Surface 1 (deepest) */}
-              <div className="bg-surface-1 rounded-[2rem] p-2 shadow-2xl">
-                {/* Middle container - Surface 2 */}
-                <div className="bg-surface-2 rounded-3xl p-1.5 border border-border">
-                  {/* Inner container - Surface 3 (raised) with grid */}
-                  <div
-                    className="relative rounded-[1.25rem] p-6 md:p-8 bg-surface-3 border border-border-raised"
-                    style={{
-                      backgroundImage: `
-                        linear-gradient(var(--border) 1px, transparent 1px),
-                        linear-gradient(90deg, var(--border) 1px, transparent 1px)
-                      `,
-                      backgroundSize: "40px 40px",
-                    }}
+                {/* Image Upload */}
+                <ImageUpload
+                  uploadedImage={uploadedImage}
+                  onImageUpload={handleImageUpload}
+                  disabled={isSearching}
+                />
+
+                {/* Action Button */}
+                <div className="mt-8 flex justify-center">
+                  <Button
+                    onClick={handleSearch}
+                    disabled={!canSearch || isSearching}
+                    className="bg-primary text-primary-foreground rounded-full px-8 py-6 text-lg font-semibold transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_var(--primary)] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                   >
                     {/* Text Search Input */}
                     <SearchInput

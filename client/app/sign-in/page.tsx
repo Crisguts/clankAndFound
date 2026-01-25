@@ -8,6 +8,9 @@ import { Button } from "@/components/ui/button"
 import { ArrowLeft, Eye, EyeOff } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 
+import { ThemeToggle } from "@/components/theme-toggle"
+import { PaletteToggle } from "@/components/palette-toggle"
+
 export default function SignInPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -41,11 +44,15 @@ export default function SignInPage() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
-      <header className="px-6 py-4">
+      <header className="px-6 py-4 flex items-center justify-between">
         <Link href="/" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
           <ArrowLeft className="h-4 w-4" />
           <span className="font-sans text-sm">Back to Home</span>
         </Link>
+        <div className="flex items-center gap-3">
+          <PaletteToggle />
+          <ThemeToggle />
+        </div>
       </header>
 
       {/* Main Content */}
