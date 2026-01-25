@@ -120,7 +120,7 @@ module.exports = {
   refineMatchesWithAnswers,
 };
 
-// 4. Generate Refinement Questions for Multiple Matches
+// 4. Generate Refinement Questions for Multiple Matches (Yes/No format)
 async function generateRefinementQuestions(inquiryText, candidates) {
   const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
 
@@ -129,22 +129,29 @@ async function generateRefinementQuestions(inquiryText, candidates) {
     .join("\n");
 
   const prompt = `
-    I am helping a user find their lost item. 
+    I am helping a user find their lost item via email. They need simple yes/no questions.
     Lost Item Description: "${inquiryText}"
-    
+
     Here are potentially matching found items:
     ${candidateDescriptions}
-    
-    The user is unsure which, if any, of these are theirs.
-    Generate 3 specific, discriminatory questions to ask the user that would help distinguish their item from these candidates.
-    Focus on details like unique markings, specific contents, brand logos, or material quirks that might not be in the initial description but could be verified.
-    
+
+    Generate 3-5 YES/NO questions that would help narrow down which item belongs to the user.
+    Questions MUST be answerable with only "Yes", "No", or "Not Sure".
+
+    Focus on:
+    - Specific colors or patterns (e.g., "Is your item blue?")
+    - Brand logos or labels (e.g., "Does your item have a Nike logo?")
+    - Distinctive features (e.g., "Does your item have a visible scratch?")
+    - Contents or accessories (e.g., "Did your bag have a laptop inside?")
+
+    DO NOT ask open-ended questions. Each question must be a simple yes/no.
+
     Return a JSON object:
     {
       "questions": [
-        "Question 1?",
-        "Question 2?",
-        "Question 3?"
+        { "text": "Is your item blue?", "type": "yes_no" },
+        { "text": "Does it have a brand logo visible?", "type": "yes_no" },
+        { "text": "Was there any visible damage or scratches?", "type": "yes_no" }
       ]
     }
   `;

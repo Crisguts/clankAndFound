@@ -5,6 +5,7 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 const TEMPLATES = {
     ADMIN_CLAIM: 'lost-item-claim',
     USER_FOUND: 'lost-item-found',
+    FOLLOW_UP_QUESTIONS: 'follow-up-questions',
 };
 
 /**
@@ -55,6 +56,30 @@ async function sendUserFoundNotification(userEmail, variables) {
 }
 
 /**
+ * Send email to user with follow-up questions link when >5 matches found
+ * @param {string} userEmail - The user's email address
+ * @param {Object} variables - Template variables (inquiry_id, questions_link, question_count)
+ * @returns {Promise<Object>} Resend response
+ */
+async function sendFollowUpQuestionsEmail(userEmail, variables) {
+    try {
+        const response = await resend.emails.send({
+            to: userEmail,
+            template: {
+                id: TEMPLATES.FOLLOW_UP_QUESTIONS,
+                variables: variables,
+            },
+        });
+
+        console.log('Follow-up questions email sent:', response);
+        return response;
+    } catch (error) {
+        console.error('Error sending follow-up questions email:', error);
+        throw error;
+    }
+}
+
+/**
  * Generic email sending method that can handle both notification types
  * @param {string} to - Recipient email (or 'admin' to use ADMIN_EMAIL from env)
  * @param {boolean} isAdminNotification - True for admin template, false for user template
@@ -85,5 +110,6 @@ async function sendEmail(to, isAdminNotification, variables) {
 module.exports = {
     sendAdminNotification,
     sendUserFoundNotification,
+    sendFollowUpQuestionsEmail,
     sendEmail,
 };

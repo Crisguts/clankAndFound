@@ -152,21 +152,8 @@ export default function SearchPage() {
       console.log(`${mode === "find" ? "Inquiry" : "Found item"} submitted:`, data)
       setSubmittedInquiryId(data.data?.id)
 
-      if (data.matches && data.matches.length > 0) {
-        // Map matches to SearchItem
-        const mappedResults = data.matches.map((m: any) => ({
-          id: m.id, // Use match ID to track scores and refinement
-          name: m.inventory?.gemini_data?.short_description || "Found Item",
-          description: m.inventory?.description || "No description",
-          imageUrl: m.inventory?.image_url,
-          category: m.inventory?.gemini_data?.category || "Unknown",
-          matchScore: Math.round(m.score * 100)
-        }))
-        setResults(mappedResults)
-        setSearchState("results")
-      } else {
-        setSearchState("submitted")
-      }
+      // Always show submitted confirmation - matches are reviewed by admin
+      setSearchState("submitted")
 
     } catch (err: any) {
       console.error("Error submitting inquiry:", err)
@@ -251,20 +238,31 @@ export default function SearchPage() {
                       Inquiry ID: <code className="bg-surface-1 px-2 py-1 rounded">{submittedInquiryId}</code>
                     </p>
                   )}
-                  <div className="flex flex-col sm:flex-row gap-4 w-full">
-                    <Button
-                      asChild
-                      className="flex-1 bg-primary text-primary-foreground rounded-full py-6 font-semibold transition-all hover:scale-105"
-                    >
-                      <Link href="/">Back to Home</Link>
-                    </Button>
-                    <Button
-                      onClick={handleReset}
-                      variant="outline"
-                      className="flex-1 rounded-full py-6 font-semibold border-border-raised text-foreground hover:bg-primary/10 hover:border-primary hover:text-primary transition-colors"
-                    >
-                      Submit Another
-                    </Button>
+                  <div className="flex flex-col gap-4 w-full">
+                    {user && (
+                      <Button
+                        asChild
+                        className="w-full bg-primary text-primary-foreground rounded-full py-6 font-semibold transition-all hover:scale-105"
+                      >
+                        <Link href="/profile">Check Status</Link>
+                      </Button>
+                    )}
+                    <div className="flex flex-col sm:flex-row gap-4">
+                      <Button
+                        asChild
+                        variant={user ? "outline" : "default"}
+                        className={`flex-1 rounded-full py-6 font-semibold ${user ? "border-border-raised text-foreground hover:bg-primary/10 hover:border-primary hover:text-primary" : "bg-primary text-primary-foreground"} transition-all hover:scale-105`}
+                      >
+                        <Link href="/">Back to Home</Link>
+                      </Button>
+                      <Button
+                        onClick={handleReset}
+                        variant="outline"
+                        className="flex-1 rounded-full py-6 font-semibold border-border-raised text-foreground hover:bg-primary/10 hover:border-primary hover:text-primary transition-colors"
+                      >
+                        Submit Another
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
