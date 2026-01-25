@@ -3,6 +3,8 @@
 import { Analytics } from "@vercel/analytics/next"
 import { Suspense } from "react"
 import React from "react"
+import { Toaster } from "@/components/ui/toaster"
+
 
 // <CHANGE> Added error boundary component to catch React errors
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
@@ -68,6 +70,7 @@ export default function ClientLayout({
         <ErrorBoundary>
           <Analytics />
         </ErrorBoundary>
+        <Toaster />
       </GlobalErrorHandler>
     </ErrorBoundary>
   )

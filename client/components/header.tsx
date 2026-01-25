@@ -65,13 +65,13 @@ export default function Header() {
               <Button
                 asChild
                 variant="outline"
-                className="rounded-full px-5 border-border hover:border-primary hover:text-primary transition-all duration-300 bg-transparent hidden sm:flex"
+                className="rounded-full w-28 h-11 border-border hover:bg-primary/10 hover:text-primary hover:border-primary transition-all duration-300 bg-transparent hidden sm:flex justify-center"
               >
                 <Link href="/sign-in">Sign In</Link>
               </Button>
               <Button
                 asChild
-                className="bg-primary text-primary-foreground rounded-full px-6 transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_rgba(29,237,131,0.5)]"
+                className="bg-primary text-primary-foreground rounded-full w-28 h-11 transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_var(--primary)] justify-center"
               >
                 <Link href="/sign-up">
                   <span className="hidden sm:inline">Sign Up</span>

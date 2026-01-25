@@ -11,11 +11,19 @@ export default function ForgotPasswordPage() {
     const [isLoading, setIsLoading] = useState(false)
     const [isSubmitted, setIsSubmitted] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const [validationError, setValidationError] = useState<string | null>(null)
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
+
+        if (!email.trim()) {
+            setValidationError("Please fill out this field.")
+            return
+        }
+
         setIsLoading(true)
         setError(null)
+        setValidationError(null)
 
         try {
             const { error } = await supabase.auth.resetPasswordForEmail(email, {
@@ -93,11 +101,22 @@ export default function ForgotPasswordPage() {
                                                 <input
                                                     type="email"
                                                     value={email}
-                                                    onChange={(e) => setEmail(e.target.value)}
+                                                    onChange={(e) => {
+                                                        setEmail(e.target.value)
+                                                        if (validationError) setValidationError(null)
+                                                    }}
                                                     placeholder="you@example.com"
-                                                    className="w-full bg-surface-2 border border-border-raised rounded-xl py-3 px-4 text-foreground placeholder:text-muted-foreground font-sans focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
-                                                    required
+                                                    className={`w-full bg-surface-2 border rounded-xl py-3 px-4 text-foreground placeholder:text-muted-foreground font-sans focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all ${validationError ? "border-destructive focus:border-destructive focus:ring-destructive/50" : "border-border-raised"
+                                                        }`}
                                                 />
+                                                {validationError && (
+                                                    <div className="absolute mt-1 bg-surface-2 text-foreground text-xs py-2 px-3 rounded-md border border-border-raised shadow-lg flex items-center gap-2 z-10 animate-in fade-in zoom-in-95 duration-200">
+                                                        <div className="bg-orange-500 rounded-sm p-0.5">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3 text-white"><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                                                        </div>
+                                                        Please fill out this field.
+                                                    </div>
+                                                )}
                                             </div>
 
                                             {error && (
@@ -109,7 +128,7 @@ export default function ForgotPasswordPage() {
                                             <Button
                                                 type="submit"
                                                 disabled={isLoading}
-                                                className="w-full bg-primary text-primary-foreground rounded-full py-6 font-semibold transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_rgba(29,237,131,0.5)] disabled:opacity-50"
+                                                className="w-full bg-primary text-primary-foreground rounded-full py-6 font-semibold transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_var(--primary)] disabled:opacity-50"
                                             >
                                                 {isLoading ? "Sending link..." : "Send Reset Link"}
                                             </Button>

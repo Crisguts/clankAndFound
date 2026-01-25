@@ -151,7 +151,22 @@ export default function SearchPage() {
 
       console.log(`${mode === "find" ? "Inquiry" : "Found item"} submitted:`, data)
       setSubmittedInquiryId(data.data?.id)
-      setSearchState("submitted")
+
+      if (data.matches && data.matches.length > 0) {
+        // Map matches to SearchItem
+        const mappedResults = data.matches.map((m: any) => ({
+          id: m.id, // Use match ID to track scores and refinement
+          name: m.inventory?.gemini_data?.short_description || "Found Item",
+          description: m.inventory?.description || "No description",
+          imageUrl: m.inventory?.image_url,
+          category: m.inventory?.gemini_data?.category || "Unknown",
+          matchScore: Math.round(m.score * 100)
+        }))
+        setResults(mappedResults)
+        setSearchState("results")
+      } else {
+        setSearchState("submitted")
+      }
 
     } catch (err: any) {
       console.error("Error submitting inquiry:", err)
@@ -246,7 +261,7 @@ export default function SearchPage() {
                     <Button
                       onClick={handleReset}
                       variant="outline"
-                      className="flex-1 rounded-full py-6 font-semibold border-border-raised hover:bg-surface-2"
+                      className="flex-1 rounded-full py-6 font-semibold border-border-raised text-foreground hover:bg-primary/10 hover:border-primary hover:text-primary transition-colors"
                     >
                       Submit Another
                     </Button>
@@ -301,7 +316,7 @@ export default function SearchPage() {
                 <Button
                   onClick={handleSearch}
                   disabled={!canSearch || isSearching}
-                  className="bg-primary text-primary-foreground rounded-full px-8 py-6 text-lg font-semibold transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_rgba(29,237,131,0.5)] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                  className="bg-primary text-primary-foreground rounded-full px-8 py-6 text-lg font-semibold transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_var(--primary)] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                 >
                   {isSearching ? (
                     <>
@@ -329,7 +344,12 @@ export default function SearchPage() {
 
             {/* Results Section */}
             {searchState === "results" && results.length > 0 && (
-              <SearchResults results={results} onReset={handleReset} />
+              <SearchResults
+                results={results}
+                onReset={handleReset}
+                inquiryId={submittedInquiryId || undefined}
+                onMatchesUpdated={setResults}
+              />
             )}
           </>
         )}

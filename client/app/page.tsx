@@ -73,12 +73,15 @@ export default function Home() {
                       </div>
                     </div>
 
-                    <Link href="/search">
-                      <button className="bg-primary text-primary-foreground px-8 py-4 rounded-full font-semibold text-lg whitespace-nowrap hover:scale-105 hover:shadow-[0_0_20px_var(--primary)] transition-all duration-300 font-sans flex items-center gap-2">
-                        <Search className="h-5 w-5" />
+                    <Button
+                      asChild
+                      className="bg-primary text-primary-foreground px-5 py-2.5 w-fit h-auto rounded-full font-semibold text-sm whitespace-nowrap hover:scale-105 hover:shadow-[0_0_20px_var(--primary)] transition-all duration-300 font-sans flex items-center gap-2"
+                    >
+                      <Link href="/search">
+                        <Search className="h-2 w-2" />
                         Start Searching
-                      </button>
-                    </Link>
+                      </Link>
+                    </Button>
                   </div>
 
                   {/* Right illustration */}
@@ -92,6 +95,34 @@ export default function Home() {
                       />
                     </div>
                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Inquiries CTA Section */}
+        <section className="mx-4 md:mx-0 mt-8">
+          <div className="bg-surface-1 rounded-[2rem] p-2">
+            <div className="bg-surface-2 rounded-[1.5rem] p-1.5 border border-border">
+              <div className="relative rounded-[1.25rem] bg-surface-3 border border-border-raised p-6 md:p-8 overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-accent/5 via-transparent to-transparent" />
+
+                <div className="relative flex flex-col md:flex-row items-center justify-between gap-4">
+                  <div className="text-center md:text-left">
+                    <h3 className="text-foreground text-xl font-semibold mb-2" style={{ fontFamily: "var(--font-geist-sans)" }}>
+                      👀 Curious about your inquiries?
+                    </h3>
+                    <p className="text-muted-foreground font-sans text-sm">
+                      Bean's been busy! Check out the status of your lost & found reports anytime.
+                    </p>
+                  </div>
+
+                  <Link href="/profile">
+                    <Button className="bg-primary text-primary-foreground rounded-full px-6 py-3 font-semibold transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_var(--primary)] whitespace-nowrap">
+                      View My Inquiries
+                    </Button>
+                  </Link>
                 </div>
               </div>
             </div>

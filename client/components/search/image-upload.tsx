@@ -1,7 +1,7 @@
 "use client"
 
 import React from "react"
-import { useCallback, useState } from "react"
+import { useCallback, useState, useEffect } from "react"
 import Image from "next/image"
 import { Upload, X, ImageIcon } from "lucide-react"
 
@@ -54,6 +54,34 @@ export function ImageUpload({ uploadedImage, onImageUpload, disabled }: ImageUpl
   const handleRemove = useCallback(() => {
     onImageUpload(null, undefined)
   }, [onImageUpload])
+
+  useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      if (disabled) return
+      const items = e.clipboardData?.items
+      if (!items) return
+
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf("image") !== -1) {
+          const file = items[i].getAsFile()
+          if (file) {
+            const reader = new FileReader()
+            reader.onload = (event) => {
+              onImageUpload(event.target?.result as string, file)
+            }
+            reader.readAsDataURL(file)
+            e.preventDefault() // Prevent default paste behavior if we handled an image
+            break
+          }
+        }
+      }
+    }
+
+    document.addEventListener("paste", handlePaste)
+    return () => {
+      document.removeEventListener("paste", handlePaste)
+    }
+  }, [disabled, onImageUpload])
 
   if (uploadedImage) {
     return (

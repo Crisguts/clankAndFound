@@ -172,7 +172,7 @@ export default function ResetPasswordPage() {
                                             <Button
                                                 type="submit"
                                                 disabled={isLoading}
-                                                className="w-full bg-primary text-primary-foreground rounded-full py-6 font-semibold transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_rgba(29,237,131,0.5)] disabled:opacity-50"
+                                                className="w-full bg-primary text-primary-foreground rounded-full py-6 font-semibold transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_var(--primary)] disabled:opacity-50"
                                             >
                                                 {isLoading ? "Updating..." : "Reset Password"}
                                             </Button>

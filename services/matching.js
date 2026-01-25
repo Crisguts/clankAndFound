@@ -24,7 +24,7 @@ async function findMatchesForInquiry(inquiryId, searchString) {
   // Search Inventory using RPC
   const { data: potentialMatches, error: searchError } = await supabase.rpc(
     "match_inventory",
-    { query_text: formattedQuery, match_threshold: 0.01, match_count: 5 }
+    { query_text: formattedQuery, match_threshold: 0.01, match_count: 20 },
   );
 
   if (searchError) {
@@ -32,7 +32,9 @@ async function findMatchesForInquiry(inquiryId, searchString) {
     return;
   }
 
-  console.log(`[Matching] Found ${potentialMatches?.length || 0} potential matches.`);
+  console.log(
+    `[Matching] Found ${potentialMatches?.length || 0} potential matches.`,
+  );
 
   if (!potentialMatches || potentialMatches.length === 0) return;
 
@@ -82,7 +84,9 @@ async function findMatchesForInquiry(inquiryId, searchString) {
  * Called when assistant adds a FOUND item.
  */
 async function findMatchesForInventoryItem(inventoryId, searchString) {
-  console.log(`[Matching] Starting reverse match for Inventory ID: ${inventoryId}`);
+  console.log(
+    `[Matching] Starting reverse match for Inventory ID: ${inventoryId}`,
+  );
 
   if (!searchString?.trim()) {
     console.log("[Matching] No search string provided. Skipping.");
@@ -129,7 +133,10 @@ async function findMatchesForInventoryItem(inventoryId, searchString) {
   if (matchRecords.length > 0) {
     const { error } = await supabase.from("matches").insert(matchRecords);
     if (error) console.error("[Matching] Insert error:", error);
-    else console.log(`[Matching] Created ${matchRecords.length} matches from inventory.`);
+    else
+      console.log(
+        `[Matching] Created ${matchRecords.length} matches from inventory.`,
+      );
   } else {
     console.log("[Matching] No matching inquiries found.");
   }
