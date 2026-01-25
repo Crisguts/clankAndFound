@@ -24,7 +24,7 @@ This document groups tasks into 4 distinct roles to minimize merge conflicts. Ea
 - [*] **API Route - Inquiry**:
     - Implement `POST /api/inquiry`.
     - Receive File -> Send to Storage -> Send to Gemini -> Save to DB.
-- [ ] **API Route - Inventory**:
+- [*] **API Route - Inventory**:
     - Implement `POST /api/inventory` (Admin adds found item).
 
 ## 🛡️ Teammate 3: Assistant Dashboard (Feature Set)
