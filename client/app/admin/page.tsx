@@ -24,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { useToast } from "@/components/ui/use-toast"
 import { supabase } from "@/lib/supabase"
 import Link from "next/link"
 
@@ -64,6 +65,7 @@ interface Inquiry {
 const categories = ["All", "Bags", "Electronics", "Accessories", "Keys", "Clothing", "Documents", "Other"]
 
 export default function AdminPage() {
+  const { toast } = useToast()
   const [activeTab, setActiveTab] = useState<ViewTab>("inventory")
   const [inventory, setInventory] = useState<InventoryItem[]>([])
   const [matches, setMatches] = useState<Match[]>([])
@@ -145,6 +147,11 @@ export default function AdminPage() {
           setStats(statsData.data)
         }
       } catch (err: any) {
+        toast({
+          title: "Error fetching data",
+          description: err.message,
+          variant: "destructive",
+        })
         setError(err.message)
       }
     }
@@ -168,11 +175,9 @@ export default function AdminPage() {
       const headers = await getAuthHeaders()
       const res = await fetch(`${API_BASE}/api/inventory/${deleteConfirmId}`, { method: "DELETE", headers })
       if (!res.ok) throw new Error("Failed to delete")
-      setInventory(prev => prev.filter(item => item.id !== deleteConfirmId))
+      setInventory(prev => prev.filter(item => item.id !== id))
     } catch (err: any) {
       setError(err.message)
-    } finally {
-      setDeleteConfirmId(null)
     }
   }, [deleteConfirmId])
 
@@ -188,8 +193,16 @@ export default function AdminPage() {
       setInventory(prev => prev.map(item =>
         item.id === id ? { ...item, status: "claimed" as ItemStatus } : item
       ))
+      toast({
+        title: "Item updated",
+        description: "Marked as claimed successfully.",
+      })
     } catch (err: any) {
-      setError(err.message)
+      toast({
+        title: "Error",
+        description: err.message,
+        variant: "destructive",
+      })
     }
   }, [])
 
@@ -203,8 +216,16 @@ export default function AdminPage() {
       })
       if (!res.ok) throw new Error("Failed to confirm")
       setMatches(prev => prev.filter(m => m.id !== matchId))
+      toast({
+        title: "Match Confirmed",
+        description: "The user has been notified via email.",
+      })
     } catch (err: any) {
-      setError(err.message)
+      toast({
+        title: "Error",
+        description: err.message,
+        variant: "destructive",
+      })
     }
   }, [])
 
@@ -218,8 +239,72 @@ export default function AdminPage() {
       })
       if (!res.ok) throw new Error("Failed to reject")
       setMatches(prev => prev.filter(m => m.id !== matchId))
+      toast({
+        title: "Match Rejected",
+        description: "The match has been removed.",
+      })
     } catch (err: any) {
-      setError(err.message)
+      toast({
+        title: "Error",
+        description: err.message,
+        variant: "destructive",
+      })
+    }
+
+  }, [])
+
+  const handleRematch = useCallback(async (inquiryId: string) => {
+    try {
+      setIsLoading(true)
+      const headers = await getAuthHeaders()
+      const res = await fetch(`${API_BASE}/api/inquiry/${inquiryId}/rematch`, {
+        method: "POST",
+        headers
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Failed to run rematch")
+      
+      // Update inquiries list to reflect any changes (though primarily logic is backend)
+      // Ideally we might want to refresh the list or show a success message
+      const matchCount = data.matches?.length || 0;
+      let description: React.ReactNode = `Found ${matchCount} matches.`;
+
+      if (matchCount > 0) {
+        description = (
+          <div className="flex flex-col gap-1 mt-2">
+            <p>Found {matchCount} potential matches:</p>
+            <ul className="list-disc list-inside text-xs">
+              {data.matches.slice(0, 3).map((m: any) => (
+                 <li key={m.id} className="truncate max-w-[200px]">
+                   {m.inventory?.description || "Unknown item"} ({(m.score * 100).toFixed(0)}%)
+                 </li>
+              ))}
+            </ul>
+             {matchCount > 3 && <p className="text-xs text-muted-foreground">...and {matchCount - 3} more</p>}
+          </div>
+        );
+      } else {
+        description = "No new matches found at this time. AI analysis complete.";
+      }
+
+      toast({
+        title: matchCount > 0 ? "Rematch Successful" : "Rematch Complete",
+        description,
+      })
+      
+      // Refresh inquiries
+      const inqRes = await fetch(`${API_BASE}/api/inquiries`, { headers })
+      const inqData = await inqRes.json()
+      if (inqRes.ok) setInquiries(inqData.data || [])
+
+    } catch (err: any) {
+      toast({
+        title: "Rematch Failed",
+        description: err.message,
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
     }
   }, [])
 
@@ -515,6 +600,7 @@ export default function AdminPage() {
                     <th className="text-left py-3 px-4 font-sans text-xs text-muted-foreground uppercase hidden md:table-cell">Date</th>
                     <th className="text-left py-3 px-4 font-sans text-xs text-muted-foreground uppercase">Status</th>
                     <th className="text-left py-3 px-4 font-sans text-xs text-muted-foreground uppercase">Matches</th>
+                    <th className="text-right py-3 px-4 font-sans text-xs text-muted-foreground uppercase">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -534,6 +620,17 @@ export default function AdminPage() {
                         <span className="text-xs">
                           {inq.match_counts?.pending || 0} pending, {inq.match_counts?.confirmed || 0} confirmed
                         </span>
+                      </td>
+                      <td className="py-4 px-4 text-right">
+                         <Button 
+                           size="sm" 
+                           variant="outline" 
+                           onClick={() => handleRematch(inq.id)}
+                           className="flex items-center gap-2"
+                         >
+                           <RefreshCw className="h-3 w-3" />
+                           Rematch
+                         </Button>
                       </td>
                     </tr>
                   ))}
