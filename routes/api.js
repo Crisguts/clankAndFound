@@ -162,4 +162,34 @@ router.post("/inventory", upload.single("image"), async (req, res) => {
   }
 });
 
+// GET /api/matches - List all matches (for assistant review)
+router.get("/matches", async (req, res) => {
+  try {
+    const { status = 'pending', limit = 50, offset = 0 } = req.query;
+
+    const { data, error, count } = await supabase
+      .from('matches')
+      .select(`
+        *,
+        inquiry:inquiries(*),
+        inventory:inventory(*)
+      `, { count: 'exact' })
+      .eq('status', status)
+      .order('score', { ascending: false })
+      .order('created_at', { ascending: false })
+      .range(parseInt(offset), parseInt(offset) + parseInt(limit) - 1);
+
+    if (error) throw error;
+
+    res.status(200).json({
+      message: "Matches retrieved successfully",
+      data: data || [],
+      count: count || 0
+    });
+  } catch (error) {
+    console.error("Error fetching matches:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
