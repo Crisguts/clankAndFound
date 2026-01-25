@@ -17,11 +17,11 @@ This document groups tasks into 4 distinct roles to minimize merge conflicts. Ea
 ## 🔧 Teammate 2: Backend Core & Gemini
 **Branch:** `feat/backend-core`
 **Focus:** Express Server, API Headers, and AI Integration.
-- [ ] **Server Setup**: Ensure `index.js` parses JSON and File Uploads correctly.
-- [ ] **Gemini Integration**:
+- [*] **Server Setup**: Ensure `index.js` parses JSON and File Uploads correctly.
+- [*] **Gemini Integration**:
     - Finish `services/gemini.js` to ensure reliable Description Generation.
     - (Optional) Add a simple logic to extract "Keywords" from the description.
-- [ ] **API Route - Inquiry**:
+- [*] **API Route - Inquiry**:
     - Implement `POST /api/inquiry`.
     - Receive File -> Send to Storage -> Send to Gemini -> Save to DB.
 - [ ] **API Route - Inventory**:

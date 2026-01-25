@@ -4,7 +4,7 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 // 1. Generate Description from Image
 async function analyzeImage(imageBuffer, mimeType) {
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+  const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
 
   const prompt = `
     Analyze this image of a lost/found item. 
@@ -31,7 +31,10 @@ async function analyzeImage(imageBuffer, mimeType) {
   const text = response.text();
 
   // Clean up code fences if present
-  const cleanedText = text.replace(/```json/g, "").replace(/```/g, "").trim();
+  const cleanedText = text
+    .replace(/```json/g, "")
+    .replace(/```/g, "")
+    .trim();
   return JSON.parse(cleanedText);
 }
 
