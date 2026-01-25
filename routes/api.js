@@ -192,4 +192,48 @@ router.get("/matches", async (req, res) => {
   }
 });
 
+// GET /api/matches/inquiry/:inquiryId - Get matches for specific inquiry
+router.get("/matches/inquiry/:inquiryId", async (req, res) => {
+  try {
+    const { inquiryId } = req.params;
+
+    // Validate UUID format
+    if (!inquiryId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+      return res.status(400).json({ error: "Invalid inquiry ID format" });
+    }
+
+    // Fetch inquiry details
+    const { data: inquiry, error: inquiryError } = await supabase
+      .from('inquiries')
+      .select('*')
+      .eq('id', inquiryId)
+      .single();
+
+    if (inquiryError || !inquiry) {
+      return res.status(404).json({ error: "Inquiry not found" });
+    }
+
+    // Fetch matches with inventory details
+    const { data: matches, error: matchesError } = await supabase
+      .from('matches')
+      .select(`
+        *,
+        inventory:inventory(*)
+      `)
+      .eq('inquiry_id', inquiryId)
+      .order('score', { ascending: false });
+
+    if (matchesError) throw matchesError;
+
+    res.status(200).json({
+      message: "Matches retrieved successfully",
+      inquiry,
+      matches: matches || []
+    });
+  } catch (error) {
+    console.error("Error fetching matches for inquiry:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
