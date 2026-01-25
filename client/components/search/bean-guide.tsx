@@ -37,6 +37,10 @@ const beanMessages: Record<AppMode, Record<SearchState, { message: string; subMe
       message: "Look what I found!",
       subMessage: "These items match your search. Click on any to see more details or claim it.",
     },
+    submitted: {
+      message: "All set!",
+      subMessage: "I've processed your search. Let me know if you need anything else!",
+    },
   },
   report: {
     idle: {
@@ -62,6 +66,10 @@ const beanMessages: Record<AppMode, Record<SearchState, { message: string; subMe
     results: {
       message: "Item reported!",
       subMessage: "Thanks for being a good human! The owner will be notified if there's a match.",
+    },
+    submitted: {
+      message: "Got it!",
+      subMessage: "I've logged your lost item report. I'll be on the lookout 24/7!",
     },
   },
 }
@@ -132,11 +140,10 @@ export function BeanGuide({ state, isSearching, mode }: BeanGuideProps) {
 function StateIndicatorPill({ label, active }: { label: string; active: boolean }) {
   return (
     <span
-      className={`px-3 py-1 rounded-full text-xs font-sans transition-all duration-300 ${
-        active
-          ? "bg-surface-3 text-primary border border-primary/50 shadow-[0_0_10px_rgba(29,237,131,0.2)]"
-          : "bg-surface-1 text-muted-foreground border border-border"
-      }`}
+      className={`px-3 py-1 rounded-full text-xs font-sans transition-all duration-300 ${active
+        ? "bg-surface-3 text-primary border border-primary/50 shadow-[0_0_10px_rgba(29,237,131,0.2)]"
+        : "bg-surface-1 text-muted-foreground border border-border"
+        }`}
     >
       {label}
     </span>

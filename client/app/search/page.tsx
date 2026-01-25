@@ -12,7 +12,10 @@ import { ModeToggle, type AppMode } from "@/components/search/mode-toggle"
 import { Button } from "@/components/ui/button"
 import { Search, Upload, Sparkles } from "lucide-react"
 
-export type SearchState = "idle" | "text-only" | "image-only" | "both" | "searching" | "results"
+import { supabase } from "@/lib/supabase"
+import { useRouter } from "next/navigation"
+
+export type SearchState = "idle" | "text-only" | "image-only" | "both" | "searching" | "results" | "submitted"
 
 export interface SearchItem {
   id: string
@@ -52,6 +55,7 @@ const mockResults: SearchItem[] = [
 ]
 
 export default function SearchPage() {
+  const router = useRouter()
   const [mode, setMode] = useState<AppMode>("find")
   const [searchState, setSearchState] = useState<SearchState>("idle")
   const [textQuery, setTextQuery] = useState("")
@@ -97,16 +101,28 @@ export default function SearchPage() {
   const handleSearch = useCallback(async () => {
     if (!textQuery && !uploadedImage) return
 
+    // Check if user is logged in
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) {
+      alert("Please sign in to report an item or search.")
+      router.push(`/sign-in?redirect=/search`)
+      return
+    }
+
     setIsSearching(true)
     setSearchState("searching")
 
     // Simulate search delay
     await new Promise((resolve) => setTimeout(resolve, 2000))
 
-    setResults(mockResults)
+    if (mode === "report") {
+      setSearchState("submitted")
+    } else {
+      setResults(mockResults)
+      setSearchState("results")
+    }
     setIsSearching(false)
-    setSearchState("results")
-  }, [textQuery, uploadedImage])
+  }, [textQuery, uploadedImage, mode, router])
 
   const handleReset = useCallback(() => {
     setTextQuery("")
@@ -120,7 +136,7 @@ export default function SearchPage() {
   return (
     <div className="w-full min-h-screen bg-background">
       <Header />
-      
+
       <main className="max-w-[1200px] mx-auto pt-24 px-4 md:px-6 pb-12">
         {/* Mode Toggle */}
         <ModeToggle mode={mode} onModeChange={handleModeChange} />
@@ -132,79 +148,107 @@ export default function SearchPage() {
 
         {/* Search Interface */}
         <div className="max-w-3xl mx-auto">
-          {/* Outer container - Surface 1 (deepest) */}
-          <div className="bg-surface-1 rounded-[2rem] p-2 shadow-2xl">
-            {/* Middle container - Surface 2 */}
-            <div className="bg-surface-2 rounded-3xl p-1.5 border border-border">
-              {/* Inner container - Surface 3 (raised) with grid */}
-              <div
-                className="relative rounded-[1.25rem] p-6 md:p-8 bg-surface-3 border border-border-raised"
-                style={{
-                  backgroundImage: `
-                    linear-gradient(var(--border) 1px, transparent 1px),
-                    linear-gradient(90deg, var(--border) 1px, transparent 1px)
-                  `,
-                  backgroundSize: "40px 40px",
-                }}
-              >
-                {/* Text Search Input */}
-                <SearchInput
-                  value={textQuery}
-                  onChange={handleTextChange}
-                  disabled={isSearching}
-                  mode={mode}
-                />
-
-                {/* Divider with "or" */}
-                <div className="flex items-center gap-4 my-6">
-                  <div className="flex-1 h-px bg-border" />
-                  <span className="text-muted-foreground text-sm font-sans">or add an image</span>
-                  <div className="flex-1 h-px bg-border" />
-                </div>
-
-                {/* Image Upload */}
-                <ImageUpload
-                  uploadedImage={uploadedImage}
-                  onImageUpload={handleImageUpload}
-                  disabled={isSearching}
-                />
-
-                {/* Action Button */}
-                <div className="mt-8 flex justify-center">
+          {searchState === "submitted" ? (
+            <div className="bg-surface-1 rounded-[2rem] p-2 shadow-2xl animate-in fade-in zoom-in duration-500">
+              <div className="bg-surface-2 rounded-3xl p-1.5 border border-border">
+                <div className="relative rounded-[1.25rem] p-8 md:p-12 bg-surface-3 border border-border-raised text-center">
+                  <div className="mb-6 flex justify-center">
+                    <div className="p-4 bg-primary/10 rounded-full">
+                      <Sparkles className="h-12 w-12 text-primary animate-pulse" />
+                    </div>
+                  </div>
+                  <h2 className="text-foreground text-3xl font-semibold mb-4" style={{ fontFamily: "var(--font-geist-sans)" }}>
+                    Thank you for your report!
+                  </h2>
+                  <p className="text-muted-foreground font-sans text-lg mb-8 max-w-md mx-auto">
+                    Bean has received the details of the lost item. We'll notify you as soon as a match is found!
+                  </p>
                   <Button
-                    onClick={handleSearch}
-                    disabled={!canSearch || isSearching}
-                    className="bg-primary text-primary-foreground rounded-full px-8 py-6 text-lg font-semibold transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_rgba(29,237,131,0.5)] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                    onClick={handleReset}
+                    className="bg-primary text-primary-foreground rounded-full px-8 py-6 text-lg font-semibold transition-all duration-300 hover:scale-105"
                   >
-                    {isSearching ? (
-                      <>
-                        <Sparkles className="mr-2 h-5 w-5 animate-pulse" />
-                        {mode === "find" ? "Bean is searching..." : "Uploading..."}
-                      </>
-                    ) : (
-                      <>
-                        {mode === "find" ? (
-                          <>
-                            <Search className="mr-2 h-5 w-5" />
-                            Search with Bean
-                          </>
-                        ) : (
-                          <>
-                            <Upload className="mr-2 h-5 w-5" />
-                            Report Found Item
-                          </>
-                        )}
-                      </>
-                    )}
+                    Submit Another Report
                   </Button>
                 </div>
               </div>
             </div>
-          </div>
+          ) : (
+            <>
+              {/* Outer container - Surface 1 (deepest) */}
+              <div className="bg-surface-1 rounded-[2rem] p-2 shadow-2xl">
+                {/* Middle container - Surface 2 */}
+                <div className="bg-surface-2 rounded-3xl p-1.5 border border-border">
+                  {/* Inner container - Surface 3 (raised) with grid */}
+                  <div
+                    className="relative rounded-[1.25rem] p-6 md:p-8 bg-surface-3 border border-border-raised"
+                    style={{
+                      backgroundImage: `
+                        linear-gradient(var(--border) 1px, transparent 1px),
+                        linear-gradient(90deg, var(--border) 1px, transparent 1px)
+                      `,
+                      backgroundSize: "40px 40px",
+                    }}
+                  >
+                    {/* Text Search Input */}
+                    <SearchInput
+                      value={textQuery}
+                      onChange={handleTextChange}
+                      disabled={isSearching}
+                      mode={mode}
+                    />
 
-          {/* Results Section */}
-          {searchState === "results" && results.length > 0 && (
-            <SearchResults results={results} onReset={handleReset} />
+                    {/* Divider with "or" */}
+                    <div className="flex items-center gap-4 my-6">
+                      <div className="flex-1 h-px bg-border" />
+                      <span className="text-muted-foreground text-sm font-sans">or add an image</span>
+                      <div className="flex-1 h-px bg-border" />
+                    </div>
+
+                    {/* Image Upload */}
+                    <ImageUpload
+                      uploadedImage={uploadedImage}
+                      onImageUpload={handleImageUpload}
+                      disabled={isSearching}
+                    />
+
+                    {/* Action Button */}
+                    <div className="mt-8 flex justify-center">
+                      <Button
+                        onClick={handleSearch}
+                        disabled={!canSearch || isSearching}
+                        className="bg-primary text-primary-foreground rounded-full px-8 py-6 text-lg font-semibold transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_rgba(29,237,131,0.5)] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                      >
+                        {isSearching ? (
+                          <>
+                            <Sparkles className="mr-2 h-5 w-5 animate-pulse" />
+                            {mode === "find" ? "Bean is searching..." : "Uploading..."}
+                          </>
+                        ) : (
+                          <>
+                            {mode === "find" ? (
+                              <>
+                                <Search className="mr-2 h-5 w-5" />
+                                Search with Bean
+                              </>
+                            ) : (
+                              <>
+                                <Upload className="mr-2 h-5 w-5" />
+                                Report Lost Item
+                              </>
+                            )}
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Results Section */}
+              {searchState === "results" && results.length > 0 && (
+                <SearchResults results={results} onReset={handleReset} />
+              )}
+            </>
           )}
         </div>
       </main>
