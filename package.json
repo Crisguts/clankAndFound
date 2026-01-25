@@ -2,6 +2,7 @@
   "name": "clank-and-found",
   "version": "1.0.0",
   "scripts": {
+    "postinstall": "npm install --prefix client",
     "dev": "concurrently \"npm run client\" \"npm run server:dev\"",
     "client": "npm run dev --prefix client",
     "server:dev": "nodemon index.js",
@@ -12,21 +13,13 @@
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
     "@supabase/supabase-js": "^2.91.1",
-    "clank-and-found": ".",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
     "multer": "^2.0.2",
-    "node": "^25.3.0",
-    "react": "^19.2.3",
-    "react-dom": "^19.2.3",
-    "resend": "^6.8.0",
-    "next": "latest"
+    "resend": "^6.8.0"
   },
   "devDependencies": {
-    "autoprefixer": "^10.4.23",
     "concurrently": "^9.2.1",
-    "nodemon": "^3.1.11",
-    "postcss": "^8.5.6",
-    "tailwindcss": "^4.1.18"
+    "nodemon": "^3.1.11"
   }
 }
