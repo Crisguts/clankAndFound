@@ -41,8 +41,10 @@ create table inventory (
   description text not null,
   -- Search Index: Automatically updates when description changes
   search_tsv tsvector generated always as (to_tsvector('english', description)) stored,
-  image_url text, 
+  image_url text,
+  gemini_data jsonb,  -- Store full Gemini analysis
   location_found text,
+  status text check (status in ('active', 'claimed', 'archived')) default 'active',
   is_claimed boolean default false,
   created_at timestamptz default now(),
   created_by uuid references auth.users(id)
@@ -54,9 +56,10 @@ create index inventory_search_idx on inventory using GIN (search_tsv);
 -- 3. INQUIRIES (The User's "Lost Item" Reports)
 create table inquiries (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid references auth.users(id) not null,
+  user_id uuid references auth.users(id),  -- Nullable for anonymous/testing
   description text not null,
   image_url text,
+  gemini_data jsonb,  -- Store full Gemini analysis
   status text check (status in ('submitted', 'under_review', 'matched', 'resolved')) default 'submitted',
   admin_notes text,
   created_at timestamptz default now()
@@ -91,9 +94,14 @@ using ( exists (select 1 from profiles where id = auth.uid() and role = 'assista
 
 -- Inquiries: Users see OWN, Assistants see ALL
 create policy "Users can insert inquiries" on inquiries for insert to authenticated with check (auth.uid() = user_id);
+create policy "Public can insert inquiries" on inquiries for insert to public with check (true);  -- Allow all inserts for testing
+create policy "Public can select own insert" on inquiries for select to public using (user_id is null);  -- Anonymous can read anonymous submissions
 create policy "Users can select own inquiries" on inquiries for select to authenticated using (auth.uid() = user_id);
 create policy "Assistants can select all inquiries" on inquiries for select to authenticated using ( exists (select 1 from profiles where id = auth.uid() and role = 'assistant') );
 create policy "Assistants can update inquiries" on inquiries for update to authenticated using ( exists (select 1 from profiles where id = auth.uid() and role = 'assistant') );
+
+create policy "Public can insert inventory" on inventory for insert to public with check (true);
+create policy "Public can read inventory" on inventory for select to public using (true);
 
 -- Matches: ASSISTANTS ONLY
 create policy "Assistants can do everything on matches"
@@ -101,6 +109,19 @@ on matches for all
 using ( exists (select 1 from profiles where id = auth.uid() and role = 'assistant') );
 
 -- Storage
-insert into storage.buckets (id, name, public) values ('images', 'images', true);
-create policy "Authenticated Upload" on storage.objects for insert to authenticated with check (bucket_id = 'images');
-create policy "Public Read" on storage.objects for select using (bucket_id = 'images');
+insert into storage.buckets (id, name, public) values ('images', 'images', true) on conflict (id) do nothing;
+insert into storage.buckets (id, name, public) values ('items', 'items', true) on conflict (id) do nothing;
+
+-- Policies (images)
+drop policy if exists "Public Upload Images" on storage.objects;
+create policy "Public Upload Images" on storage.objects for insert to public with check (bucket_id = 'images');
+
+drop policy if exists "Public Read Images" on storage.objects;
+create policy "Public Read Images" on storage.objects for select to public using (bucket_id = 'images');
+
+-- Policies (items)
+drop policy if exists "Public Upload Items" on storage.objects;
+create policy "Public Upload Items" on storage.objects for insert to public with check (bucket_id = 'items');
+
+drop policy if exists "Public Read Items" on storage.objects;
+create policy "Public Read Items" on storage.objects for select to public using (bucket_id = 'items');

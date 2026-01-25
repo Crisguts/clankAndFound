@@ -1,0 +1,394 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* Light mode (default) */
+:root {
+  --background: rgb(250, 250, 250); /* Light gray background */
+  --foreground: rgb(23, 23, 23); /* Near-black text */
+  
+  /* 3-tier surface system for depth (light mode - darker = deeper) */
+  --surface-1: rgb(255, 255, 255); /* White - deepest layer */
+  --surface-2: rgb(245, 245, 245); /* Light gray - mid layer */
+  --surface-3: rgb(235, 235, 235); /* Slightly darker - raised layer */
+  
+  --card: var(--surface-2);
+  --card-foreground: rgb(23, 23, 23);
+  --popover: var(--surface-3);
+  --popover-foreground: rgb(23, 23, 23);
+  --primary: rgb(16, 185, 97); /* Slightly darker green for better contrast on light */
+  --primary-foreground: rgb(255, 255, 255); /* White text on green */
+  --secondary: var(--surface-3);
+  --secondary-foreground: rgb(23, 23, 23);
+  --muted: var(--surface-2);
+  --muted-foreground: rgb(115, 115, 115); /* Medium gray */
+  --accent: rgb(16, 185, 97); /* Green accent */
+  --accent-foreground: rgb(255, 255, 255);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: rgb(255, 255, 255);
+  --border: rgb(229, 229, 229); /* Light border */
+  --border-raised: rgb(212, 212, 212); /* Slightly darker border for raised elements */
+  --input: var(--surface-3);
+  --ring: rgb(16, 185, 97);
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --radius: 0.625rem;
+  --sidebar: rgb(255, 255, 255);
+  --sidebar-foreground: rgb(23, 23, 23);
+  --sidebar-primary: rgb(23, 23, 23);
+  --sidebar-primary-foreground: rgb(255, 255, 255);
+  --sidebar-accent: rgb(245, 245, 245);
+  --sidebar-accent-foreground: rgb(23, 23, 23);
+  --sidebar-border: rgb(229, 229, 229);
+  --sidebar-ring: rgb(163, 163, 163);
+}
+
+/* Dark mode (system preference - when no manual override) */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --background: rgb(0, 0, 0); /* #000000 - deepest background */
+    --foreground: oklch(0.985 0 0); /* white text */
+    
+    /* 3-tier surface system for depth (dark mode - lighter = raised) */
+    --surface-1: rgb(8, 8, 8); /* deepest layer - slightly above background */
+    --surface-2: rgb(18, 18, 18); /* mid layer - cards, containers */
+    --surface-3: rgb(28, 28, 28); /* raised layer - inputs, interactive elements */
+    
+    --card: var(--surface-2);
+    --card-foreground: oklch(0.985 0 0);
+    --popover: var(--surface-3);
+    --popover-foreground: oklch(0.985 0 0);
+    --primary: rgb(29, 237, 131); /* #1DED83 - bright green accent */
+    --primary-foreground: oklch(0.05 0 0); /* black text on green */
+    --secondary: var(--surface-3);
+    --secondary-foreground: oklch(0.985 0 0);
+    --muted: var(--surface-2);
+    --muted-foreground: rgb(158, 158, 158); /* gray-400 equivalent */
+    --accent: oklch(0.85 0.25 150); /* same as primary - green accent */
+    --accent-foreground: oklch(0.05 0 0);
+    --destructive: oklch(0.577 0.245 27.325);
+    --destructive-foreground: oklch(0.985 0 0);
+    --border: rgb(38, 38, 38); /* subtle border */
+    --border-raised: rgb(52, 52, 52); /* brighter border for raised elements */
+    --input: var(--surface-3);
+    --ring: oklch(0.85 0.25 150);
+    --chart-1: oklch(0.646 0.222 41.116);
+    --chart-2: oklch(0.6 0.118 184.704);
+    --chart-3: oklch(0.398 0.07 227.392);
+    --chart-4: oklch(0.828 0.189 84.429);
+    --chart-5: oklch(0.769 0.188 70.08);
+    --sidebar: oklch(0.05 0 0);
+    --sidebar-foreground: oklch(0.985 0 0);
+    --sidebar-primary: oklch(0.985 0 0);
+    --sidebar-primary-foreground: oklch(0.05 0 0);
+    --sidebar-accent: oklch(0.15 0 0);
+    --sidebar-accent-foreground: oklch(0.985 0 0);
+    --sidebar-border: rgb(38, 38, 38);
+    --sidebar-ring: oklch(0.708 0 0);
+  }
+}
+
+/* Manual dark mode override */
+:root[data-theme="dark"] {
+  --background: rgb(0, 0, 0);
+  --foreground: oklch(0.985 0 0);
+  --surface-1: rgb(8, 8, 8);
+  --surface-2: rgb(18, 18, 18);
+  --surface-3: rgb(28, 28, 28);
+  --card: var(--surface-2);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: var(--surface-3);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: rgb(29, 237, 131);
+  --primary-foreground: oklch(0.05 0 0);
+  --secondary: var(--surface-3);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: var(--surface-2);
+  --muted-foreground: rgb(158, 158, 158);
+  --accent: oklch(0.85 0.25 150);
+  --accent-foreground: oklch(0.05 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: rgb(38, 38, 38);
+  --border-raised: rgb(52, 52, 52);
+  --input: var(--surface-3);
+  --ring: oklch(0.85 0.25 150);
+  --sidebar: oklch(0.05 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.985 0 0);
+  --sidebar-primary-foreground: oklch(0.05 0 0);
+  --sidebar-accent: oklch(0.15 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: rgb(38, 38, 38);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+@theme inline {
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  
+  /* Surface system for layered depth */
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-border-raised: var(--border-raised);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  /* Adding Montserrat font utility class */
+  --font-family-montserrat: var(--font-montserrat);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Added custom slow spin animation for rotating text */
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 20s linear infinite;
+}
+
+/* ===== COLOR PALETTES ===== */
+
+/* Forest (Default) - Green theme */
+:root[data-palette="forest"],
+:root:not([data-palette]) {
+  --primary: rgb(16, 185, 97);
+  --primary-foreground: rgb(255, 255, 255);
+  --accent: rgb(16, 185, 97);
+  --accent-foreground: rgb(255, 255, 255);
+  --ring: rgb(16, 185, 97);
+  --image-hue: 0deg;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-palette="forest"]:not([data-theme="light"]),
+  :root:not([data-palette]):not([data-theme="light"]) {
+    --primary: rgb(29, 237, 131);
+    --primary-foreground: rgb(0, 0, 0);
+    --accent: rgb(29, 237, 131);
+    --accent-foreground: rgb(0, 0, 0);
+    --ring: rgb(29, 237, 131);
+  }
+}
+
+:root[data-theme="dark"][data-palette="forest"],
+:root[data-theme="dark"]:not([data-palette]) {
+  --primary: rgb(29, 237, 131);
+  --primary-foreground: rgb(0, 0, 0);
+  --accent: rgb(29, 237, 131);
+  --accent-foreground: rgb(0, 0, 0);
+  --ring: rgb(29, 237, 131);
+}
+
+/* Ocean - Blue theme */
+:root[data-palette="ocean"] {
+  --primary: rgb(37, 99, 235);
+  --primary-foreground: rgb(255, 255, 255);
+  --accent: rgb(37, 99, 235);
+  --accent-foreground: rgb(255, 255, 255);
+  --ring: rgb(37, 99, 235);
+  --image-hue: 200deg;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-palette="ocean"]:not([data-theme="light"]) {
+    --primary: rgb(96, 165, 250);
+    --primary-foreground: rgb(0, 0, 0);
+    --accent: rgb(96, 165, 250);
+    --accent-foreground: rgb(0, 0, 0);
+    --ring: rgb(96, 165, 250);
+  }
+}
+
+:root[data-theme="dark"][data-palette="ocean"] {
+  --primary: rgb(96, 165, 250);
+  --primary-foreground: rgb(0, 0, 0);
+  --accent: rgb(96, 165, 250);
+  --accent-foreground: rgb(0, 0, 0);
+  --ring: rgb(96, 165, 250);
+}
+
+/* Sunset - Orange theme */
+:root[data-palette="sunset"] {
+  --primary: rgb(234, 88, 12);
+  --primary-foreground: rgb(255, 255, 255);
+  --accent: rgb(234, 88, 12);
+  --accent-foreground: rgb(255, 255, 255);
+  --ring: rgb(234, 88, 12);
+  --image-hue: 30deg;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-palette="sunset"]:not([data-theme="light"]) {
+    --primary: rgb(251, 146, 60);
+    --primary-foreground: rgb(0, 0, 0);
+    --accent: rgb(251, 146, 60);
+    --accent-foreground: rgb(0, 0, 0);
+    --ring: rgb(251, 146, 60);
+  }
+}
+
+:root[data-theme="dark"][data-palette="sunset"] {
+  --primary: rgb(251, 146, 60);
+  --primary-foreground: rgb(0, 0, 0);
+  --accent: rgb(251, 146, 60);
+  --accent-foreground: rgb(0, 0, 0);
+  --ring: rgb(251, 146, 60);
+}
+
+/* Lavender - Purple theme */
+:root[data-palette="lavender"] {
+  --primary: rgb(147, 51, 234);
+  --primary-foreground: rgb(255, 255, 255);
+  --accent: rgb(147, 51, 234);
+  --accent-foreground: rgb(255, 255, 255);
+  --ring: rgb(147, 51, 234);
+  --image-hue: 280deg;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-palette="lavender"]:not([data-theme="light"]) {
+    --primary: rgb(192, 132, 252);
+    --primary-foreground: rgb(0, 0, 0);
+    --accent: rgb(192, 132, 252);
+    --accent-foreground: rgb(0, 0, 0);
+    --ring: rgb(192, 132, 252);
+  }
+}
+
+:root[data-theme="dark"][data-palette="lavender"] {
+  --primary: rgb(192, 132, 252);
+  --primary-foreground: rgb(0, 0, 0);
+  --accent: rgb(192, 132, 252);
+  --accent-foreground: rgb(0, 0, 0);
+  --ring: rgb(192, 132, 252);
+}
+
+/* Monochrome - Gray theme */
+:root[data-palette="monochrome"] {
+  --primary: rgb(82, 82, 82);
+  --primary-foreground: rgb(255, 255, 255);
+  --accent: rgb(82, 82, 82);
+  --accent-foreground: rgb(255, 255, 255);
+  --ring: rgb(82, 82, 82);
+  --image-hue: 0deg;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-palette="monochrome"]:not([data-theme="light"]) {
+    --primary: rgb(163, 163, 163);
+    --primary-foreground: rgb(0, 0, 0);
+    --accent: rgb(163, 163, 163);
+    --accent-foreground: rgb(0, 0, 0);
+    --ring: rgb(163, 163, 163);
+  }
+}
+
+:root[data-theme="dark"][data-palette="monochrome"] {
+  --primary: rgb(163, 163, 163);
+  --primary-foreground: rgb(0, 0, 0);
+  --accent: rgb(163, 163, 163);
+  --accent-foreground: rgb(0, 0, 0);
+  --ring: rgb(163, 163, 163);
+}
+
+/* Image tinting based on palette - grayscale first to neutralize, then colorize */
+.themed-image {
+  filter: grayscale(1) brightness(1.2) sepia(1) saturate(2.5) hue-rotate(var(--image-hue, 90deg));
+  transition: filter 0.3s ease;
+}
+
+/* Forest palette - keep original green look for static images */
+:root[data-palette="forest"] .themed-image,
+:root:not([data-palette]) .themed-image {
+  filter: none;
+}
+
+/* Monochrome uses grayscale */
+:root[data-palette="monochrome"] .themed-image {
+  filter: grayscale(1) contrast(1.1) brightness(1.1);
+}
+
+/* Spline 3D scene color tinting - specific filters per palette for accurate color matching */
+.spline-themed {
+  transition: filter 0.3s ease;
+}
+
+/* Forest palette - keep original green */
+:root[data-palette="forest"] .spline-themed,
+:root:not([data-palette]) .spline-themed {
+  filter: none;
+}
+
+/* Ocean - Blue */
+:root[data-palette="ocean"] .spline-themed {
+  filter: grayscale(1) brightness(1.1) sepia(1) saturate(3) hue-rotate(180deg);
+}
+
+/* Sunset - Orange */
+:root[data-palette="sunset"] .spline-themed {
+  filter: grayscale(1) brightness(1.1) sepia(1) saturate(2.5) hue-rotate(-10deg);
+}
+
+/* Lavender - Purple */
+:root[data-palette="lavender"] .spline-themed {
+  filter: grayscale(1) brightness(0.9) sepia(1) saturate(5) hue-rotate(250deg);
+}
+
+/* Monochrome - Gray */
+:root[data-palette="monochrome"] .spline-themed {
+  filter: grayscale(1) contrast(1.1) brightness(1.05);
+}
