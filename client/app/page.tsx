@@ -13,7 +13,7 @@ export default function Home() {
         {/* Hero Section */}
         <main className="w-full relative h-[600px]">
           <Header />
-          <SplineScene />
+          <SplineScene className="absolute inset-0" />
           <HeroTextOverlay />
           <RotatingTextAccent />
         </main>
@@ -73,7 +73,7 @@ export default function Home() {
                     </div>
 
                     <Link href="/search">
-                      <button className="bg-primary text-primary-foreground px-8 py-4 rounded-full font-semibold text-lg whitespace-nowrap hover:scale-105 hover:shadow-[0_0_20px_rgba(29,237,131,0.5)] transition-all duration-300 font-sans flex items-center gap-2">
+                      <button className="bg-primary text-primary-foreground px-8 py-4 rounded-full font-semibold text-lg whitespace-nowrap hover:scale-105 hover:shadow-[0_0_20px_var(--primary)] transition-all duration-300 font-sans flex items-center gap-2">
                         <Search className="h-5 w-5" />
                         Start Searching
                       </button>

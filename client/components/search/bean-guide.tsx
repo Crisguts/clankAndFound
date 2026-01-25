@@ -4,6 +4,7 @@ import { useMemo } from "react"
 import Image from "next/image"
 import type { SearchState } from "@/app/search/page"
 import type { AppMode } from "@/components/search/mode-toggle"
+import SplineScene from "@/components/spline-scene"
 
 interface BeanGuideProps {
   state: SearchState
@@ -83,17 +84,11 @@ export function BeanGuide({ state, isSearching, mode }: BeanGuideProps) {
   return (
     <div className="flex flex-col items-center gap-4">
       {/* Bean Character */}
-      <div className={`relative transition-all duration-500 ${isSearching ? "animate-bounce" : ""}`}>
-        <Image
-          src={beanImageSrc || "/placeholder.svg"}
-          alt="Bean the friendly guide"
-          width={120}
-          height={120}
-          className="object-contain themed-image"
-        />
+      <div className={`relative transition-all duration-500 w-[350px] h-[330px] ${isSearching ? "animate-bounce" : ""}`}>
+        <SplineScene className="bg-transparent" />
         {/* Glow effect when searching */}
         {isSearching && (
-          <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl animate-pulse" />
+          <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl animate-pulse -z-10" />
         )}
       </div>
 
@@ -132,11 +127,10 @@ export function BeanGuide({ state, isSearching, mode }: BeanGuideProps) {
 function StateIndicatorPill({ label, active }: { label: string; active: boolean }) {
   return (
     <span
-      className={`px-3 py-1 rounded-full text-xs font-sans transition-all duration-300 ${
-        active
-          ? "bg-surface-3 text-primary border border-primary/50 shadow-[0_0_10px_rgba(29,237,131,0.2)]"
-          : "bg-surface-1 text-muted-foreground border border-border"
-      }`}
+      className={`px-3 py-1 rounded-full text-xs font-sans transition-all duration-300 ${active
+        ? "bg-surface-3 text-primary border border-primary/50 shadow-[0_0_10px_rgba(29,237,131,0.2)]"
+        : "bg-surface-1 text-muted-foreground border border-border"
+        }`}
     >
       {label}
     </span>

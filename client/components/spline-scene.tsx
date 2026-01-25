@@ -3,7 +3,7 @@
 import { Suspense, useState } from "react"
 import Spline from "@splinetool/react-spline"
 
-export default function SplineScene() {
+export default function SplineScene({ className }: { className?: string }) {
     const [isLoading, setIsLoading] = useState(true)
     const [hasError, setHasError] = useState(false)
 
@@ -18,7 +18,7 @@ export default function SplineScene() {
     }
 
     return (
-        <div className="absolute inset-0 w-full h-full bg-background">
+        <div className={`w-full h-full bg-background ${className || ""}`}>
             {/* Loading state */}
             {isLoading && (
                 <div className="absolute inset-0 w-full h-full flex items-center justify-center">
