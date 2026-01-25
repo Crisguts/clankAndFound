@@ -80,6 +80,9 @@ export default function AdminPage() {
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null)
   const [stats, setStats] = useState<any>(null)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+  const [rematchModalMatches, setRematchModalMatches] = useState<Match[]>([])
+  const [rematchModalInquiry, setRematchModalInquiry] = useState<Inquiry | null>(null)
+  const [isRematchModalOpen, setIsRematchModalOpen] = useState(false)
 
   // Check auth and role
   useEffect(() => {
@@ -175,7 +178,7 @@ export default function AdminPage() {
       const headers = await getAuthHeaders()
       const res = await fetch(`${API_BASE}/api/inventory/${deleteConfirmId}`, { method: "DELETE", headers })
       if (!res.ok) throw new Error("Failed to delete")
-      setInventory(prev => prev.filter(item => item.id !== id))
+      setInventory(prev => prev.filter(item => item.id !== deleteConfirmId))
     } catch (err: any) {
       setError(err.message)
     }
@@ -263,35 +266,13 @@ export default function AdminPage() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Failed to run rematch")
-      
-      // Update inquiries list to reflect any changes (though primarily logic is backend)
-      // Ideally we might want to refresh the list or show a success message
-      const matchCount = data.matches?.length || 0;
-      let description: React.ReactNode = `Found ${matchCount} matches.`;
 
-      if (matchCount > 0) {
-        description = (
-          <div className="flex flex-col gap-1 mt-2">
-            <p>Found {matchCount} potential matches:</p>
-            <ul className="list-disc list-inside text-xs">
-              {data.matches.slice(0, 3).map((m: any) => (
-                 <li key={m.id} className="truncate max-w-[200px]">
-                   {m.inventory?.description || "Unknown item"} ({(m.score * 100).toFixed(0)}%)
-                 </li>
-              ))}
-            </ul>
-             {matchCount > 3 && <p className="text-xs text-muted-foreground">...and {matchCount - 3} more</p>}
-          </div>
-        );
-      } else {
-        description = "No new matches found at this time. AI analysis complete.";
-      }
+      // Find the inquiry to display in modal
+      const inquiry = inquiries.find(inq => inq.id === inquiryId)
+      setRematchModalInquiry(inquiry || null)
+      setRematchModalMatches(data.matches || [])
+      setIsRematchModalOpen(true)
 
-      toast({
-        title: matchCount > 0 ? "Rematch Successful" : "Rematch Complete",
-        description,
-      })
-      
       // Refresh inquiries
       const inqRes = await fetch(`${API_BASE}/api/inquiries`, { headers })
       const inqData = await inqRes.json()
@@ -305,6 +286,78 @@ export default function AdminPage() {
       })
     } finally {
       setIsLoading(false)
+    }
+  }, [inquiries, toast])
+
+  const handleModalConfirmMatch = useCallback(async (matchId: string) => {
+    try {
+      const headers = await getAuthHeaders()
+      const res = await fetch(`${API_BASE}/api/match/${matchId}`, {
+        method: "PATCH",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "confirmed" })
+      })
+      if (!res.ok) throw new Error("Failed to confirm")
+      setRematchModalMatches(prev => prev.filter(m => m.id !== matchId))
+      setMatches(prev => prev.filter(m => m.id !== matchId))
+      toast({
+        title: "Match Confirmed",
+        description: "The user has been notified via email.",
+      })
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: err.message,
+        variant: "destructive",
+      })
+    }
+  }, [toast])
+
+  const handleModalRejectMatch = useCallback(async (matchId: string) => {
+    try {
+      const headers = await getAuthHeaders()
+      const res = await fetch(`${API_BASE}/api/match/${matchId}`, {
+        method: "PATCH",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "rejected" })
+      })
+      if (!res.ok) throw new Error("Failed to reject")
+      setRematchModalMatches(prev => prev.filter(m => m.id !== matchId))
+      setMatches(prev => prev.filter(m => m.id !== matchId))
+      toast({
+        title: "Match Rejected",
+        description: "The match has been removed.",
+      })
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: err.message,
+        variant: "destructive",
+      })
+    }
+  }, [toast])
+
+  const handleCloseRematchModal = useCallback(async () => {
+    setIsRematchModalOpen(false)
+    setRematchModalMatches([])
+    setRematchModalInquiry(null)
+    // Refresh matches and inquiries
+    try {
+      const headers = await getAuthHeaders()
+      const [matchRes, inqRes] = await Promise.all([
+        fetch(`${API_BASE}/api/matches?status=pending`, { headers }),
+        fetch(`${API_BASE}/api/inquiries`, { headers })
+      ])
+      if (matchRes.ok) {
+        const matchData = await matchRes.json()
+        setMatches(matchData.data || [])
+      }
+      if (inqRes.ok) {
+        const inqData = await inqRes.json()
+        setInquiries(inqData.data || [])
+      }
+    } catch (err) {
+      // Silently fail - data will refresh on next tab change
     }
   }, [])
 
@@ -762,6 +815,107 @@ export default function AdminPage() {
                     className="flex-1 rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/80 hover:scale-105 transition-all duration-200"
                   >
                     Yes, Delete
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rematch Results Modal */}
+      {isRematchModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+          onClick={handleCloseRematchModal}
+        >
+          <div
+            className="bg-surface-1 rounded-2xl p-1 shadow-2xl max-w-3xl w-full mx-4 max-h-[80vh] flex flex-col animate-in fade-in zoom-in duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="bg-surface-2 rounded-xl p-1 border border-border flex flex-col max-h-full">
+              <div className="bg-surface-3 rounded-lg border border-border-raised flex flex-col max-h-full">
+                {/* Modal Header */}
+                <div className="flex items-center justify-between p-6 border-b border-border shrink-0">
+                  <div>
+                    <h3 className="text-xl font-semibold text-foreground" style={{ fontFamily: "var(--font-geist-sans)" }}>
+                      Match Results
+                    </h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Found {rematchModalMatches.length} potential match{rematchModalMatches.length !== 1 ? "es" : ""} for this inquiry
+                    </p>
+                  </div>
+                  <button onClick={handleCloseRematchModal} className="p-2 hover:bg-surface-2 rounded-lg">
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+
+                {/* Inquiry Preview */}
+                {rematchModalInquiry && (
+                  <div className="p-4 border-b border-border bg-surface-2/50 shrink-0">
+                    <p className="text-xs text-muted-foreground mb-2">User's Lost Item</p>
+                    <div className="flex items-center gap-3">
+                      {rematchModalInquiry.image_url && (
+                        <img src={rematchModalInquiry.image_url} alt="" className="w-16 h-16 rounded-lg object-cover" />
+                      )}
+                      <p className="text-sm text-foreground line-clamp-2">{rematchModalInquiry.description}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Matches List */}
+                <div className="overflow-y-auto flex-1 p-4 space-y-4">
+                  {rematchModalMatches.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Search className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                      <p className="font-medium text-foreground mb-1">No Matches Found</p>
+                      <p className="text-sm">AI analysis complete. No matching items in inventory at this time.</p>
+                    </div>
+                  ) : rematchModalMatches.map((match) => (
+                    <div key={match.id} className="bg-surface-2 rounded-xl border border-border p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm text-muted-foreground">
+                          Match Score: <strong className="text-primary">{(match.score * 100).toFixed(0)}%</strong>
+                        </span>
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="outline" onClick={() => handleModalRejectMatch(match.id)}>
+                            Reject
+                          </Button>
+                          <Button size="sm" onClick={() => handleModalConfirmMatch(match.id)}>
+                            Confirm
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="bg-surface-3 rounded-lg p-3 border border-border-raised">
+                        <p className="text-xs text-muted-foreground mb-2">Found Item</p>
+                        <div className="flex items-start gap-3">
+                          {match.inventory?.image_url && (
+                            <img src={match.inventory.image_url} alt="" className="w-20 h-20 rounded-lg object-cover shrink-0" />
+                          )}
+                          <p className="text-sm text-foreground">{match.inventory?.description}</p>
+                        </div>
+                      </div>
+                      {match.admin_notes && (
+                        <p className="text-xs text-muted-foreground mt-3">AI Notes: {match.admin_notes}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Modal Footer */}
+                <div className="p-4 border-t border-border shrink-0 flex justify-between items-center">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      handleCloseRematchModal()
+                      setActiveTab("matches")
+                    }}
+                    className="text-sm"
+                  >
+                    View All in Matches Tab
+                  </Button>
+                  <Button onClick={handleCloseRematchModal}>
+                    Done
                   </Button>
                 </div>
               </div>
