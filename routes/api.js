@@ -236,4 +236,66 @@ router.get("/matches/inquiry/:inquiryId", async (req, res) => {
   }
 });
 
+// PATCH /api/match/:id - Update match status (approve/reject)
+router.patch("/match/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, admin_notes } = req.body;
+
+    // Validate status
+    if (!status || !['confirmed', 'rejected'].includes(status)) {
+      return res.status(400).json({
+        error: "Invalid status. Must be 'confirmed' or 'rejected'"
+      });
+    }
+
+    // Validate UUID format
+    if (!id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+      return res.status(400).json({ error: "Invalid match ID format" });
+    }
+
+    // Fetch current match to get inquiry_id
+    const { data: match, error: fetchError } = await supabase
+      .from('matches')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !match) {
+      return res.status(404).json({ error: "Match not found" });
+    }
+
+    // Update match status
+    const updateData = { status };
+    if (admin_notes) {
+      updateData.admin_notes = admin_notes;
+    }
+
+    const { data: updatedMatch, error: updateError } = await supabase
+      .from('matches')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (updateError) throw updateError;
+
+    // If confirmed, update inquiry status to 'matched'
+    if (status === 'confirmed') {
+      await supabase
+        .from('inquiries')
+        .update({ status: 'matched' })
+        .eq('id', match.inquiry_id);
+    }
+
+    res.status(200).json({
+      message: `Match ${status} successfully`,
+      data: updatedMatch
+    });
+  } catch (error) {
+    console.error("Error updating match:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
