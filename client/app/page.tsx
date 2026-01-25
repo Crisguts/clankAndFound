@@ -112,19 +112,6 @@ export default function Home() {
                 backgroundSize: "40px 40px",
               }}
             >
-              {/* Decorative plus signs in corners */}
-              <div className="absolute top-8 left-8 text-foreground opacity-50 text-5xl font-extralight font-sans leading-[0rem]">
-                +
-              </div>
-              <div className="absolute top-8 right-8 text-foreground opacity-50 text-5xl font-sans leading-[0] font-extralight">
-                +
-              </div>
-              <div className="absolute bottom-8 left-8 text-foreground opacity-50 text-5xl font-sans font-extralight">
-                +
-              </div>
-              <div className="absolute bottom-8 right-8 text-foreground opacity-50 text-5xl font-sans font-extralight">
-                +
-              </div>
 
               <div className="px-6 md:px-40">
                 <div className="flex items-center justify-center mb-3.5 md:gap-11">
