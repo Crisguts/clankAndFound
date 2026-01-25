@@ -34,7 +34,7 @@ export default function Header() {
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/0 backdrop-blur-sm">
       <div className="flex items-center justify-between px-6 py-4">
         <Link href="/" className="text-foreground font-sans font-bold text-xl hover:text-primary transition-colors">
-          Meet Bean
+          ClankAndFound: Meet Bean
         </Link>
 
         <div className="flex items-center gap-3">
@@ -43,14 +43,14 @@ export default function Header() {
 
           {user ? (
             <div className="flex items-center gap-3">
-              <div className="hidden sm:flex items-center gap-2 bg-surface-2 border border-border rounded-full px-4 py-1.5">
+              <Link href="/profile" className="hidden sm:flex items-center gap-2 bg-surface-2 border border-border rounded-full px-4 py-1.5 hover:border-primary transition-all">
                 <div className="w-6 h-6 bg-primary/20 rounded-full flex items-center justify-center">
                   <User className="h-3 w-3 text-primary" />
                 </div>
                 <span className="text-sm font-sans truncate max-w-[100px]">
                   {user.user_metadata?.full_name || user.email?.split('@')[0]}
                 </span>
-              </div>
+              </Link>
               <Button
                 onClick={handleSignOut}
                 variant="outline"

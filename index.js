@@ -1,9 +1,14 @@
 const express = require("express");
 const path = require("path");
+const cors = require("cors");
 require("dotenv").config();
 const app = express();
 
 // Middleware
+app.use(cors({
+  origin: ["http://localhost:3000", "http://127.0.0.1:3000"],
+  credentials: true,
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

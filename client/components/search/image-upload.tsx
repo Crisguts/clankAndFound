@@ -7,7 +7,7 @@ import { Upload, X, ImageIcon } from "lucide-react"
 
 interface ImageUploadProps {
   uploadedImage: string | null
-  onImageUpload: (imageUrl: string | null) => void
+  onImageUpload: (imageUrl: string | null, file?: File) => void
   disabled?: boolean
 }
 
@@ -27,14 +27,14 @@ export function ImageUpload({ uploadedImage, onImageUpload, disabled }: ImageUpl
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
     setIsDragging(false)
-    
+
     if (disabled) return
 
     const file = e.dataTransfer.files[0]
     if (file && file.type.startsWith("image/")) {
       const reader = new FileReader()
       reader.onload = (event) => {
-        onImageUpload(event.target?.result as string)
+        onImageUpload(event.target?.result as string, file)
       }
       reader.readAsDataURL(file)
     }
@@ -45,14 +45,14 @@ export function ImageUpload({ uploadedImage, onImageUpload, disabled }: ImageUpl
     if (file && file.type.startsWith("image/")) {
       const reader = new FileReader()
       reader.onload = (event) => {
-        onImageUpload(event.target?.result as string)
+        onImageUpload(event.target?.result as string, file)
       }
       reader.readAsDataURL(file)
     }
   }, [onImageUpload])
 
   const handleRemove = useCallback(() => {
-    onImageUpload(null)
+    onImageUpload(null, undefined)
   }, [onImageUpload])
 
   if (uploadedImage) {
@@ -65,12 +65,10 @@ export function ImageUpload({ uploadedImage, onImageUpload, disabled }: ImageUpl
         <div className="bg-surface-1 rounded-2xl p-1">
           <div className="bg-surface-2 rounded-xl p-1 border border-border">
             <div className="relative rounded-lg overflow-hidden border border-border-raised bg-surface-3">
-              <Image
+              <img
                 src={uploadedImage || "/placeholder.svg"}
                 alt="Uploaded reference"
-                width={400}
-                height={200}
-                className="w-full h-48 object-cover"
+                className="w-full h-auto max-h-[500px] object-contain rounded-lg bg-black/5"
               />
               {!disabled && (
                 <button
@@ -102,11 +100,10 @@ export function ImageUpload({ uploadedImage, onImageUpload, disabled }: ImageUpl
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
-            className={`relative border-2 border-dashed rounded-lg p-8 text-center transition-all bg-surface-3 ${
-              isDragging
-                ? "border-primary bg-primary/5"
-                : "border-border-raised hover:border-primary/50"
-            } ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+            className={`relative border-2 border-dashed rounded-lg p-8 text-center transition-all bg-surface-3 ${isDragging
+              ? "border-primary bg-primary/5"
+              : "border-border-raised hover:border-primary/50"
+              } ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
           >
             <input
               type="file"
@@ -115,7 +112,7 @@ export function ImageUpload({ uploadedImage, onImageUpload, disabled }: ImageUpl
               disabled={disabled}
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
             />
-            
+
             <div className="flex flex-col items-center gap-3">
               {/* Icon with layered background */}
               <div className="bg-surface-1 p-1 rounded-full">

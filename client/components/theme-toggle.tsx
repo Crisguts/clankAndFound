@@ -36,7 +36,7 @@ export function ThemeToggle() {
     return (
       <Button
         size="icon"
-        className="bg-primary text-primary-foreground rounded-full transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_rgba(29,237,131,0.5)]"
+        className="bg-primary text-primary-foreground rounded-full transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_var(--primary)]"
       >
         <span className="h-4 w-4" />
       </Button>
@@ -47,7 +47,7 @@ export function ThemeToggle() {
     <Button
       size="icon"
       onClick={toggleTheme}
-      className="bg-primary text-primary-foreground rounded-full transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_rgba(29,237,131,0.5)]"
+      className="bg-primary text-primary-foreground rounded-full transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_var(--primary)]"
       title={isDark ? "Switch to light mode" : "Switch to dark mode"}
     >
       {isDark ? (

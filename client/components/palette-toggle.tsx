@@ -81,7 +81,7 @@ export function PaletteToggle() {
     return (
       <Button
         size="icon"
-        className="bg-primary text-primary-foreground rounded-full transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_rgba(29,237,131,0.5)]"
+        className="bg-primary text-primary-foreground rounded-full transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_var(--primary)]"
       >
         <Palette className="h-4 w-4" />
       </Button>
@@ -111,11 +111,10 @@ export function PaletteToggle() {
                     <button
                       key={palette.id}
                       onClick={() => selectPalette(palette.id)}
-                      className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 ${
-                        currentPalette === palette.id
+                      className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 ${currentPalette === palette.id
                           ? "bg-primary/10 border border-primary/30"
                           : "hover:bg-surface-2 border border-transparent"
-                      }`}
+                        }`}
                     >
                       <div className="flex gap-0.5">
                         <div

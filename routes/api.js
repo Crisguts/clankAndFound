@@ -15,62 +15,82 @@ router.post("/data", (req, res) => {
 const multer = require("multer");
 const { analyzeImage, generateMatchQuestions } = require("../services/gemini");
 const supabase = require("../services/supabase");
-const { findMatchesForInquiry } = require("../services/matching");
+const { findMatchesForInquiry, findMatchesForInventoryItem } = require("../services/matching");
+const { sendUserFoundNotification, sendAdminNotification } = require("../services/email");
 
 // Configure Multer (Memory Storage)
 const upload = multer({ storage: multer.memoryStorage() });
 
 const rateLimit = require("../middleware/rateLimit");
+const { verifyToken, requireAssistant, optionalAuth } = require("../middleware/auth");
 
-// POST /inquiry - User submits a lost item
-router.post("/inquiry", rateLimit, upload.single("image"), async (req, res) => {
+// POST /inquiry - User submits a lost item (image and/or text)
+router.post("/inquiry", rateLimit, optionalAuth, upload.single("image"), async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: "Image is required" });
-    }
+    const { description: textDescription } = req.body;
+    const hasImage = !!req.file;
+    const hasText = !!textDescription && textDescription.trim();
 
-    console.log("Analyzing image...");
-    // 1. Analyze with Gemini
-    const analysis = await analyzeImage(req.file.buffer, req.file.mimetype);
-    console.log("Gemini Analysis:", analysis);
-
-    // 2. Upload Image to Supabase Storage
-    const funcFileExt = req.file.mimetype.split("/")[1];
-    const fileName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${funcFileExt}`;
-
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from("images") // User's lost item images
-      .upload(fileName, req.file.buffer, {
-        contentType: req.file.mimetype,
+    // Require at least one of image or text
+    if (!hasImage && !hasText) {
+      return res.status(400).json({
+        error: "Either an image or text description is required"
       });
-
-    if (uploadError) {
-      console.error("Supabase Upload Error:", uploadError);
-      return res
-        .status(500)
-        .json({ error: "Failed to upload image", details: uploadError });
     }
 
-    // Get Public URL
-    const {
-      data: { publicUrl },
-    } = supabase.storage.from("images").getPublicUrl(fileName);
+    let analysis = null;
+    let imageUrl = null;
+    let finalDescription = textDescription || "";
 
-    // 3. Save flattened data to DB
-    // Using "extracted_data" column for JSON, or mapping fields if table has them.
-    // Based on PRD/Tasks, we probably save the whole analysis or specific fields.
-    // Assuming table 'inquiries' has fields for json data.
+    // If image provided, analyze with Gemini and upload
+    if (hasImage) {
+      console.log("Analyzing image with Gemini...");
+      analysis = await analyzeImage(req.file.buffer, req.file.mimetype);
+      console.log("Gemini Analysis:", analysis);
 
+      // Upload Image to Supabase Storage
+      const fileExt = req.file.mimetype.split("/")[1];
+      const fileName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("images")
+        .upload(fileName, req.file.buffer, {
+          contentType: req.file.mimetype,
+        });
+
+      if (uploadError) {
+        console.error("Supabase Upload Error:", uploadError);
+        return res.status(500).json({
+          error: "Failed to upload image",
+          details: uploadError
+        });
+      }
+
+      // Get Public URL
+      const { data: { publicUrl } } = supabase.storage.from("images").getPublicUrl(fileName);
+      imageUrl = publicUrl;
+
+      // Use Gemini description if no text provided, or combine both
+      if (!hasText) {
+        finalDescription = analysis.detailed_description;
+      } else {
+        finalDescription = `${textDescription}. AI Analysis: ${analysis.detailed_description}`;
+      }
+    }
+
+    // Attach user_id if authenticated
+    const userId = req.user?.id || null;
+
+    // Save to database
     const { data: insertData, error: insertError } = await supabase
       .from("inquiries")
-      .insert([
-        {
-          image_url: publicUrl,
-          description: analysis.detailed_description, // or short_description
-          gemini_data: analysis, // Storing full JSON
-          status: "submitted",
-        },
-      ])
+      .insert([{
+        user_id: userId,
+        image_url: imageUrl,
+        description: finalDescription,
+        gemini_data: analysis,
+        status: "submitted",
+      }])
       .select();
 
     if (insertError) {
@@ -78,32 +98,43 @@ router.post("/inquiry", rateLimit, upload.single("image"), async (req, res) => {
       return res.status(500).json({ error: "Failed to save inquiry" });
     }
 
-    res
-      .status(200)
-      .json({ message: "Inquiry received", data: insertData[0], analysis });
+    const inquiry = insertData[0];
 
-    // Trigger matching process asynchronously
-    if (insertData && insertData[0]) {
-      const keywords =
-        analysis.keywords ||
-        analysis.short_description ||
-        analysis.detailed_description;
-      // We don't await this to keep response fast, or we do await to ensure it works?
-      // For this task, let's await to see logs in console easily, or just fire and forget.
-      // User said "go slowly", so let's await it to be sure.
-      await findMatchesForInquiry(insertData[0].id, keywords);
+    res.status(200).json({
+      message: "Inquiry received",
+      data: inquiry,
+      analysis
+    });
+
+    // Send admin notification
+    try {
+      await sendAdminNotification({
+        description: finalDescription,
+        inquiry_id: inquiry.id,
+        user_email: req.user?.email || "Anonymous",
+      });
+      console.log("Admin notification sent");
+    } catch (emailErr) {
+      console.error("Failed to send admin notification:", emailErr);
     }
+
+    // Trigger matching process
+    const keywords = analysis?.keywords ||
+      analysis?.short_description ||
+      finalDescription;
+
+    await findMatchesForInquiry(inquiry.id, keywords);
+
   } catch (error) {
     console.error("Error processing inquiry:", error);
     res.status(500).json({
       error: error.message || "Internal Server Error",
-      stack: error.stack,
     });
   }
 });
 
-// POST /inventory - Admin adds found item
-router.post("/inventory", upload.single("image"), async (req, res) => {
+// POST /inventory - Anyone can submit a found item
+router.post("/inventory", rateLimit, optionalAuth, upload.single("image"), async (req, res) => {
   try {
     // Similar logic, might be just text or also image.
     // Assuming image is optional or required. Let's assume required for now.
@@ -155,17 +186,22 @@ router.post("/inventory", upload.single("image"), async (req, res) => {
     res
       .status(200)
       .json({ message: "Item added to inventory", data: insertData[0] });
+
+    // Trigger matching against existing inquiries
+    const inventoryItem = insertData[0];
+    const keywords = analysis.keywords || analysis.short_description || analysis.detailed_description;
+    await findMatchesForInventoryItem(inventoryItem.id, keywords);
+
   } catch (error) {
     console.error("Error adding to inventory:", error);
     res.status(500).json({
       error: error.message || "Internal Server Error",
-      stack: error.stack,
     });
   }
 });
 
 // GET /api/inventory - Browse and search inventory
-router.get("/inventory", async (req, res) => {
+router.get("/inventory", verifyToken, requireAssistant, async (req, res) => {
   try {
     const { search, status = "active", limit = 50, offset = 0 } = req.query;
 
@@ -213,7 +249,7 @@ router.get("/inventory", async (req, res) => {
 });
 
 // PATCH /api/inventory/:id - Edit inventory item
-router.patch("/inventory/:id", async (req, res) => {
+router.patch("/inventory/:id", verifyToken, requireAssistant, async (req, res) => {
   try {
     const { id } = req.params;
     const { description, status, location_found } = req.body;
@@ -278,7 +314,7 @@ router.patch("/inventory/:id", async (req, res) => {
 });
 
 // DELETE /api/inventory/:id - Delete or archive item
-router.delete("/inventory/:id", async (req, res) => {
+router.delete("/inventory/:id", verifyToken, requireAssistant, async (req, res) => {
   try {
     const { id } = req.params;
     const { permanent = false } = req.query;
@@ -339,7 +375,7 @@ router.delete("/inventory/:id", async (req, res) => {
 });
 
 // GET /api/inventory/:id/matches - Get matches for inventory item
-router.get("/inventory/:id/matches", async (req, res) => {
+router.get("/inventory/:id/matches", verifyToken, requireAssistant, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -389,7 +425,7 @@ router.get("/inventory/:id/matches", async (req, res) => {
 });
 
 // GET /api/matches - List all matches (for assistant review)
-router.get("/matches", async (req, res) => {
+router.get("/matches", verifyToken, requireAssistant, async (req, res) => {
   try {
     const { status = "pending", limit = 50, offset = 0 } = req.query;
 
@@ -472,7 +508,7 @@ router.get("/matches/inquiry/:inquiryId", async (req, res) => {
 });
 
 // PATCH /api/match/:id - Update match status (approve/reject)
-router.patch("/match/:id", async (req, res) => {
+router.patch("/match/:id", verifyToken, requireAssistant, async (req, res) => {
   try {
     const { id } = req.params;
     const { status, admin_notes } = req.body;
@@ -519,12 +555,38 @@ router.patch("/match/:id", async (req, res) => {
 
     if (updateError) throw updateError;
 
-    // If confirmed, update inquiry status to 'matched'
+    // If confirmed, update inquiry status to 'matched' and send email
     if (status === "confirmed") {
-      await supabase
+      // Update inquiry status
+      const { data: inquiry } = await supabase
         .from("inquiries")
         .update({ status: "matched" })
-        .eq("id", match.inquiry_id);
+        .eq("id", match.inquiry_id)
+        .select(`*, profiles:user_id(email)`)
+        .single();
+
+      // Send email notification if user has email
+      if (inquiry?.profiles?.email) {
+        try {
+          // Fetch inventory item details for the email
+          const { data: inventoryItem } = await supabase
+            .from("inventory")
+            .select("description, location_found")
+            .eq("id", match.inventory_id)
+            .single();
+
+          await sendUserFoundNotification(inquiry.profiles.email, {
+            item_description: inquiry.description,
+            matched_item: inventoryItem?.description || "Found item",
+            location: inventoryItem?.location_found || "Contact admin for details",
+            inquiry_id: inquiry.id,
+          });
+          console.log(`Email notification sent to ${inquiry.profiles.email}`);
+        } catch (emailError) {
+          console.error("Failed to send email notification:", emailError);
+          // Don't fail the request if email fails
+        }
+      }
     }
 
     res.status(200).json({
@@ -538,7 +600,7 @@ router.patch("/match/:id", async (req, res) => {
 });
 
 // GET /api/inquiries - List all inquiries with match counts
-router.get("/inquiries", async (req, res) => {
+router.get("/inquiries", verifyToken, requireAssistant, async (req, res) => {
   try {
     const { status, search, limit = 50, offset = 0 } = req.query;
 
@@ -712,7 +774,7 @@ router.patch("/inquiry/:id", async (req, res) => {
 });
 
 // POST /api/inquiry/:id/rematch - Trigger re-matching
-router.post("/inquiry/:id/rematch", async (req, res) => {
+router.post("/inquiry/:id/rematch", verifyToken, requireAssistant, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -764,7 +826,7 @@ router.post("/inquiry/:id/rematch", async (req, res) => {
 });
 
 // GET /api/stats - Dashboard statistics
-router.get("/stats", async (req, res) => {
+router.get("/stats", verifyToken, requireAssistant, async (req, res) => {
   try {
     // Get inquiry counts by status
     const { count: submittedInquiries } = await supabase
@@ -837,7 +899,7 @@ router.get("/stats", async (req, res) => {
 });
 
 // GET /api/matches/:id/questions - Generate follow-up questions
-router.get("/matches/:id/questions", async (req, res) => {
+router.get("/matches/:id/questions", verifyToken, requireAssistant, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -882,4 +944,111 @@ router.get("/matches/:id/questions", async (req, res) => {
   }
 });
 
+// ============================================
+// USER PROFILE ENDPOINTS (/my/*)
+// ============================================
+
+// GET /my/inquiries - Get user's own inquiries
+router.get("/my/inquiries", verifyToken, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("inquiries")
+      .select("*")
+      .eq("user_id", req.user.id)
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    res.status(200).json({ data });
+  } catch (error) {
+    console.error("Error fetching user inquiries:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /my/matches - Get confirmed matches for user's inquiries
+router.get("/my/matches", verifyToken, async (req, res) => {
+  try {
+    // First get user's inquiry IDs
+    const { data: inquiries, error: inqError } = await supabase
+      .from("inquiries")
+      .select("id")
+      .eq("user_id", req.user.id);
+
+    if (inqError) throw inqError;
+
+    const inquiryIds = inquiries.map((i) => i.id);
+
+    if (inquiryIds.length === 0) {
+      return res.status(200).json({ data: [] });
+    }
+
+    // Get confirmed matches for those inquiries
+    const { data: matches, error: matchError } = await supabase
+      .from("matches")
+      .select(`
+        *,
+        inquiry:inquiries(id, description, image_url, created_at),
+        inventory:inventory(id, description, image_url, location_found)
+      `)
+      .in("inquiry_id", inquiryIds)
+      .eq("status", "confirmed")
+      .order("created_at", { ascending: false });
+
+    if (matchError) throw matchError;
+
+    res.status(200).json({ data: matches });
+  } catch (error) {
+    console.error("Error fetching user matches:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// PATCH /my/matches/:id/claim - User claims the matched item
+router.patch("/my/matches/:id/claim", verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Verify match belongs to user's inquiry
+    const { data: match, error: fetchError } = await supabase
+      .from("matches")
+      .select(`*, inquiry:inquiries(user_id)`)
+      .eq("id", id)
+      .single();
+
+    if (fetchError || !match) {
+      return res.status(404).json({ error: "Match not found" });
+    }
+
+    if (match.inquiry.user_id !== req.user.id) {
+      return res.status(403).json({ error: "Not authorized to claim this match" });
+    }
+
+    // Update inquiry status to resolved
+    const { error: inqError } = await supabase
+      .from("inquiries")
+      .update({ status: "resolved" })
+      .eq("id", match.inquiry_id);
+
+    if (inqError) throw inqError;
+
+    // Update inventory item as claimed
+    const { error: invError } = await supabase
+      .from("inventory")
+      .update({ status: "claimed" })
+      .eq("id", match.inventory_id);
+
+    if (invError) throw invError;
+
+    res.status(200).json({
+      message: "Item claimed successfully! Visit the lost & found office to pick it up.",
+      data: { match_id: id, inquiry_id: match.inquiry_id, inventory_id: match.inventory_id },
+    });
+  } catch (error) {
+    console.error("Error claiming match:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
+

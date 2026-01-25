@@ -14,7 +14,7 @@ export default function Home() {
         {/* Hero Section */}
         <main className="w-full relative h-[600px]">
           <Header />
-          <SplineScene />
+          <SplineScene className="absolute inset-0" />
           <HeroTextOverlay />
           <RotatingTextAccent />
         </main>
@@ -73,12 +73,12 @@ export default function Home() {
                       </div>
                     </div>
 
-                    <Button asChild className="bg-primary text-primary-foreground px-8 py-4 rounded-full font-semibold text-lg whitespace-nowrap hover:scale-105 hover:shadow-[0_0_20px_rgba(29,237,131,0.5)] transition-all duration-300 font-sans flex items-center gap-2">
-                      <Link href="/search">
+                    <Link href="/search">
+                      <button className="bg-primary text-primary-foreground px-8 py-4 rounded-full font-semibold text-lg whitespace-nowrap hover:scale-105 hover:shadow-[0_0_20px_var(--primary)] transition-all duration-300 font-sans flex items-center gap-2">
                         <Search className="h-5 w-5" />
                         Start Searching
-                      </Link>
-                    </Button>
+                      </button>
+                    </Link>
                   </div>
 
                   {/* Right illustration */}
@@ -113,19 +113,6 @@ export default function Home() {
                 backgroundSize: "40px 40px",
               }}
             >
-              {/* Decorative plus signs in corners */}
-              <div className="absolute top-8 left-8 text-foreground opacity-50 text-5xl font-extralight font-sans leading-[0rem]">
-                +
-              </div>
-              <div className="absolute top-8 right-8 text-foreground opacity-50 text-5xl font-sans leading-[0] font-extralight">
-                +
-              </div>
-              <div className="absolute bottom-8 left-8 text-foreground opacity-50 text-5xl font-sans font-extralight">
-                +
-              </div>
-              <div className="absolute bottom-8 right-8 text-foreground opacity-50 text-5xl font-sans font-extralight">
-                +
-              </div>
 
               <div className="px-6 md:px-40">
                 <div className="flex items-center justify-center mb-3.5 md:gap-11">

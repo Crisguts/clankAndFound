@@ -4,6 +4,7 @@ import { useMemo } from "react"
 import Image from "next/image"
 import type { SearchState } from "@/app/search/page"
 import type { AppMode } from "@/components/search/mode-toggle"
+import SplineScene from "@/components/spline-scene"
 
 interface BeanGuideProps {
   state: SearchState
@@ -91,17 +92,11 @@ export function BeanGuide({ state, isSearching, mode }: BeanGuideProps) {
   return (
     <div className="flex flex-col items-center gap-4">
       {/* Bean Character */}
-      <div className={`relative transition-all duration-500 ${isSearching ? "animate-bounce" : ""}`}>
-        <Image
-          src={beanImageSrc || "/placeholder.svg"}
-          alt="Bean the friendly guide"
-          width={120}
-          height={120}
-          className="object-contain themed-image"
-        />
+      <div className={`relative transition-all duration-500 w-[350px] h-[330px] ${isSearching ? "animate-bounce" : ""}`}>
+        <SplineScene className="bg-transparent" />
         {/* Glow effect when searching */}
         {isSearching && (
-          <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl animate-pulse" />
+          <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl animate-pulse -z-10" />
         )}
       </div>
 

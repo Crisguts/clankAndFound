@@ -3,7 +3,7 @@
 import { Suspense, useState } from "react"
 import Spline from "@splinetool/react-spline"
 
-export default function SplineScene() {
+export default function SplineScene({ className }: { className?: string }) {
     const [isLoading, setIsLoading] = useState(true)
     const [hasError, setHasError] = useState(false)
 
@@ -18,7 +18,7 @@ export default function SplineScene() {
     }
 
     return (
-        <div className="absolute inset-0 w-full h-full bg-background">
+        <div className={`w-full h-full bg-background ${className || ""}`}>
             {/* Loading state */}
             {isLoading && (
                 <div className="absolute inset-0 w-full h-full flex items-center justify-center">
@@ -41,20 +41,20 @@ export default function SplineScene() {
 
             {/* Spline Scene with color tint overlay */}
             {!hasError && (
-                <div className="relative w-full h-full spline-themed">
+                <div className="relative w-full h-full spline-themed overflow-hidden">
                     <Suspense fallback={null}>
-                        <Spline
-                            scene="https://prod.spline.design/l8gr6AhxxCqDIdBx/scene.splinecode"
-                            onLoad={handleLoad}
-                            onError={handleError}
-                            style={{
-                                width: "100%",
-                                height: "100%",
-                                background: "transparent",
-                            }}
-                        />
-                        {/* Overlay to hide branding */}
-                        <div className="absolute bottom-0 right-0 w-48 h-16 bg-background z-50 pointer-events-none"></div>
+                        <div className="w-full h-[calc(100%+100px)]">
+                            <Spline
+                                scene="https://prod.spline.design/l8gr6AhxxCqDIdBx/scene.splinecode"
+                                onLoad={handleLoad}
+                                onError={handleError}
+                                style={{
+                                    width: "100%",
+                                    height: "100%",
+                                    background: "transparent",
+                                }}
+                            />
+                        </div>
                     </Suspense>
                 </div>
             )}
