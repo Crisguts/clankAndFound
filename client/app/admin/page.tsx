@@ -216,6 +216,43 @@ export default function AdminPage() {
     }
   }, [])
 
+  const handleAddItem = useCallback(async (formData: FormData) => {
+    try {
+      const headers = await getAuthHeaders()
+      const res = await fetch(`${API_BASE}/api/inventory`, {
+        method: "POST",
+        headers: { "Authorization": headers.Authorization },
+        body: formData,
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || "Failed to add item")
+      }
+      const data = await res.json()
+      setInventory(prev => [data.data, ...prev])
+      setIsAddModalOpen(false)
+    } catch (err: any) {
+      setError(err.message)
+    }
+  }, [])
+
+  const handleEditItem = useCallback(async (id: string, updates: { description?: string; location_found?: string; status?: ItemStatus }) => {
+    try {
+      const headers = await getAuthHeaders()
+      const res = await fetch(`${API_BASE}/api/inventory/${id}`, {
+        method: "PATCH",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      })
+      if (!res.ok) throw new Error("Failed to update item")
+      const data = await res.json()
+      setInventory(prev => prev.map(item => item.id === id ? { ...item, ...updates } : item))
+      setEditingItem(null)
+    } catch (err: any) {
+      setError(err.message)
+    }
+  }, [])
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "active":
@@ -362,6 +399,10 @@ export default function AdminPage() {
                   <SelectItem value="archived">Archived</SelectItem>
                 </SelectContent>
               </Select>
+              <Button onClick={() => setIsAddModalOpen(true)} className="gap-2">
+                <Plus className="h-4 w-4" />
+                Add Item
+              </Button>
             </div>
           </div>
         )}
@@ -401,6 +442,9 @@ export default function AdminPage() {
                       <td className="py-4 px-4">{getStatusBadge(item.status)}</td>
                       <td className="py-4 px-4">
                         <div className="flex items-center justify-end gap-2">
+                          <button onClick={() => setEditingItem(item)} className="p-2 rounded-lg hover:bg-accent/20 text-muted-foreground hover:text-accent" title="Edit">
+                            <Pencil className="h-4 w-4" />
+                          </button>
                           {item.status === "active" && (
                             <button onClick={() => handleResolveItem(item.id)} className="p-2 rounded-lg hover:bg-primary/20 text-muted-foreground hover:text-primary" title="Mark Claimed">
                               <CheckCircle className="h-4 w-4" />
@@ -488,6 +532,91 @@ export default function AdminPage() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {/* Add Item Modal */}
+        {isAddModalOpen && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-surface-2 rounded-2xl border border-border w-full max-w-lg p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-semibold">Add Found Item</h2>
+                <button onClick={() => setIsAddModalOpen(false)} className="p-2 hover:bg-surface-3 rounded-lg">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <form onSubmit={async (e) => {
+                e.preventDefault()
+                const form = e.currentTarget
+                const formData = new FormData(form)
+                await handleAddItem(formData)
+              }}>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Item Image *</label>
+                    <input type="file" name="image" accept="image/*" required className="w-full bg-surface-3 border border-border-raised rounded-lg p-3 text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Location Found</label>
+                    <input type="text" name="location_found" placeholder="e.g., Library 2nd floor" className="w-full bg-surface-3 border border-border-raised rounded-lg p-3 text-sm" />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-3 mt-6">
+                  <Button type="button" variant="outline" onClick={() => setIsAddModalOpen(false)}>Cancel</Button>
+                  <Button type="submit">Add to Inventory</Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Item Modal */}
+        {editingItem && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-surface-2 rounded-2xl border border-border w-full max-w-lg p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-semibold">Edit Item</h2>
+                <button onClick={() => setEditingItem(null)} className="p-2 hover:bg-surface-3 rounded-lg">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <form onSubmit={async (e) => {
+                e.preventDefault()
+                const form = e.currentTarget
+                const formData = new FormData(form)
+                await handleEditItem(editingItem.id, {
+                  description: formData.get("description") as string,
+                  location_found: formData.get("location_found") as string,
+                  status: formData.get("status") as ItemStatus,
+                })
+              }}>
+                <div className="space-y-4">
+                  {editingItem.image_url && (
+                    <img src={editingItem.image_url} alt="" className="w-full h-40 object-cover rounded-lg" />
+                  )}
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Description</label>
+                    <textarea name="description" defaultValue={editingItem.description} rows={3} className="w-full bg-surface-3 border border-border-raised rounded-lg p-3 text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Location Found</label>
+                    <input type="text" name="location_found" defaultValue={editingItem.location_found || ""} className="w-full bg-surface-3 border border-border-raised rounded-lg p-3 text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Status</label>
+                    <select name="status" defaultValue={editingItem.status} className="w-full bg-surface-3 border border-border-raised rounded-lg p-3 text-sm">
+                      <option value="active">Active</option>
+                      <option value="claimed">Claimed</option>
+                      <option value="archived">Archived</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="flex justify-end gap-3 mt-6">
+                  <Button type="button" variant="outline" onClick={() => setEditingItem(null)}>Cancel</Button>
+                  <Button type="submit">Save Changes</Button>
+                </div>
+              </form>
             </div>
           </div>
         )}
