@@ -77,6 +77,7 @@ export default function AdminPage() {
   const [user, setUser] = useState<any>(null)
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null)
   const [stats, setStats] = useState<any>(null)
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
 
   // Check auth and role
   useEffect(() => {
@@ -156,18 +157,24 @@ export default function AdminPage() {
     return { "Authorization": `Bearer ${session?.access_token}` }
   }
 
-  const handleDeleteItem = useCallback(async (id: string) => {
-    if (!confirm("Are you sure you want to archive this item?")) return
+  const handleDeleteItem = useCallback((id: string) => {
+    setDeleteConfirmId(id)
+  }, [])
+
+  const confirmDelete = useCallback(async () => {
+    if (!deleteConfirmId) return
 
     try {
       const headers = await getAuthHeaders()
-      const res = await fetch(`${API_BASE}/api/inventory/${id}`, { method: "DELETE", headers })
+      const res = await fetch(`${API_BASE}/api/inventory/${deleteConfirmId}`, { method: "DELETE", headers })
       if (!res.ok) throw new Error("Failed to delete")
-      setInventory(prev => prev.filter(item => item.id !== id))
+      setInventory(prev => prev.filter(item => item.id !== deleteConfirmId))
     } catch (err: any) {
       setError(err.message)
+    } finally {
+      setDeleteConfirmId(null)
     }
-  }, [])
+  }, [deleteConfirmId])
 
   const handleResolveItem = useCallback(async (id: string) => {
     try {
@@ -621,6 +628,50 @@ export default function AdminPage() {
           </div>
         )}
       </main>
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmId && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+          onClick={() => setDeleteConfirmId(null)}
+        >
+          <div
+            className="bg-surface-1 rounded-2xl p-1 shadow-2xl max-w-md w-full mx-4 animate-in fade-in zoom-in duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="bg-surface-2 rounded-xl p-1 border border-border">
+              <div className="bg-surface-3 rounded-lg p-6 border border-border-raised">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="bg-destructive/10 p-3 rounded-full">
+                    <AlertCircle className="h-6 w-6 text-destructive" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-foreground" style={{ fontFamily: "var(--font-geist-sans)" }}>
+                    Delete Item?
+                  </h3>
+                </div>
+                <p className="text-muted-foreground font-sans text-sm mb-6">
+                  Are you sure you want to delete this item? This action cannot be undone.
+                </p>
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={() => setDeleteConfirmId(null)}
+                    className="flex-1 rounded-full border-border text-foreground hover:bg-primary/10 hover:border-primary hover:text-primary transition-colors"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={confirmDelete}
+                    className="flex-1 rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/80 hover:scale-105 transition-all duration-200"
+                  >
+                    Yes, Delete
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

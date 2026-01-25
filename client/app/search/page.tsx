@@ -246,7 +246,7 @@ export default function SearchPage() {
                     <Button
                       onClick={handleReset}
                       variant="outline"
-                      className="flex-1 rounded-full py-6 font-semibold border-border-raised hover:bg-surface-2"
+                      className="flex-1 rounded-full py-6 font-semibold border-border-raised text-foreground hover:bg-primary/10 hover:border-primary hover:text-primary transition-colors"
                     >
                       Submit Another
                     </Button>
