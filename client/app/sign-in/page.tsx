@@ -6,6 +6,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, Eye, EyeOff } from "lucide-react"
+import { supabase } from "@/lib/supabase"
 
 import { ThemeToggle } from "@/components/theme-toggle"
 import { PaletteToggle } from "@/components/palette-toggle"
@@ -15,15 +16,29 @@ export default function SignInPage() {
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
-    // Placeholder for auth logic
-    setTimeout(() => {
+    setError(null)
+
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+
+      if (error) throw error
+
+      if (data.user) {
+        window.location.href = "/"
+      }
+    } catch (error: any) {
+      setError(error.message || "An error occurred during sign in")
+    } finally {
       setIsLoading(false)
-      alert("Sign in functionality will be implemented with authentication")
-    }, 1000)
+    }
   }
 
   return (
@@ -103,6 +118,12 @@ export default function SignInPage() {
                       </button>
                     </div>
                   </div>
+
+                  {error && (
+                    <div className="bg-destructive/10 border border-destructive/20 text-destructive text-xs py-3 px-4 rounded-lg font-sans">
+                      {error}
+                    </div>
+                  )}
 
                   <div className="flex justify-end">
                     <Link href="/forgot-password" className="text-primary text-sm font-sans hover:underline">

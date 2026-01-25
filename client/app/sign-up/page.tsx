@@ -6,6 +6,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, Eye, EyeOff } from "lucide-react"
+import { supabase } from "@/lib/supabase"
 
 import { ThemeToggle } from "@/components/theme-toggle"
 import { PaletteToggle } from "@/components/palette-toggle"
@@ -18,19 +19,41 @@ export default function SignUpPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [isSuccess, setIsSuccess] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError(null)
+    setIsSuccess(false)
+
     if (password !== confirmPassword) {
-      alert("Passwords do not match")
+      setError("Passwords do not match")
       return
     }
     setIsLoading(true)
-    // Placeholder for auth logic
-    setTimeout(() => {
+
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: name,
+          }
+        }
+      })
+
+      if (error) throw error
+
+      if (data.user) {
+        setIsSuccess(true)
+      }
+    } catch (error: any) {
+      setError(error.message || "An error occurred during sign up")
+    } finally {
       setIsLoading(false)
-      alert("Sign up functionality will be implemented with authentication")
-    }, 1000)
+    }
   }
 
   return (
@@ -147,6 +170,18 @@ export default function SignUpPage() {
                       </button>
                     </div>
                   </div>
+
+                  {error && (
+                    <div className="bg-destructive/10 border border-destructive/20 text-destructive text-xs py-3 px-4 rounded-lg font-sans text-center">
+                      {error}
+                    </div>
+                  )}
+
+                  {isSuccess && (
+                    <div className="bg-primary/10 border border-primary/20 text-primary text-xs py-3 px-4 rounded-lg font-sans text-center">
+                      Sign up successful! Please check your email for verification.
+                    </div>
+                  )}
 
                   <Button
                     type="submit"

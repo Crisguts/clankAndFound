@@ -38,6 +38,10 @@ const beanMessages: Record<AppMode, Record<SearchState, { message: string; subMe
       message: "Look what I found!",
       subMessage: "These items match your search. Click on any to see more details or claim it.",
     },
+    submitted: {
+      message: "Thank you!",
+      subMessage: "I've recorded your inquiry. I'll let you know if I find anything!",
+    },
   },
   report: {
     idle: {
@@ -63,6 +67,10 @@ const beanMessages: Record<AppMode, Record<SearchState, { message: string; subMe
     results: {
       message: "Item reported!",
       subMessage: "Thanks for being a good human! The owner will be notified if there's a match.",
+    },
+    submitted: {
+      message: "Success!",
+      subMessage: "I've logged your report. Thank you for helping out!",
     },
   },
 }
