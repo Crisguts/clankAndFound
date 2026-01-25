@@ -118,4 +118,31 @@ drop policy if exists "Public Upload Items" on storage.objects;
 create policy "Public Upload Items" on storage.objects for insert to public with check (bucket_id = 'items');
 
 drop policy if exists "Public Read Items" on storage.objects;
-create policy "Public Read Items" on storage.objects for select to public using (bucket_id = 'items');
+
+-- 5. RPC: Match Inventory (with Scoring)
+create or replace function match_inventory(query_text text, match_threshold float default 0.1, match_count int default 10)
+returns table (
+  id uuid,
+  description text,
+  status text,
+  rank float
+)
+language plpgsql
+as $$
+begin
+  return query
+  select
+    i.id,
+    i.description,
+    i.status,
+    ts_rank(i.search_tsv, websearch_to_tsquery('english', query_text))::float as rank
+  from inventory i
+  where
+    i.status = 'active'
+    and i.search_tsv @@ websearch_to_tsquery('english', query_text)
+    and ts_rank(i.search_tsv, websearch_to_tsquery('english', query_text)) > match_threshold
+  order by rank desc
+  limit match_count;
+end;
+$$ security definer;
+

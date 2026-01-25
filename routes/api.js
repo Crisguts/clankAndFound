@@ -15,6 +15,7 @@ router.post("/data", (req, res) => {
 const multer = require("multer");
 const { analyzeImage } = require("../services/gemini");
 const supabase = require("../services/supabase");
+const { findMatchesForInquiry } = require("../services/matching");
 
 // Configure Multer (Memory Storage)
 const upload = multer({ storage: multer.memoryStorage() });
@@ -78,6 +79,18 @@ router.post("/inquiry", upload.single("image"), async (req, res) => {
     res
       .status(200)
       .json({ message: "Inquiry received", data: insertData[0], analysis });
+
+    // Trigger matching process asynchronously
+    if (insertData && insertData[0]) {
+      const keywords =
+        analysis.keywords ||
+        analysis.short_description ||
+        analysis.detailed_description;
+      // We don't await this to keep response fast, or we do await to ensure it works?
+      // For this task, let's await to see logs in console easily, or just fire and forget.
+      // User said "go slowly", so let's await it to be sure.
+      await findMatchesForInquiry(insertData[0].id, keywords);
+    }
   } catch (error) {
     console.error("Error processing inquiry:", error);
     res.status(500).json({
