@@ -363,29 +363,16 @@
 }
 
 /* Spline 3D scene color tinting - specific filters per palette for accurate color matching */
+/* Spline Scene with color tint overlay - matching static image logic */
 .spline-themed {
   transition: filter 0.3s ease;
+  filter: grayscale(1) brightness(1.2) sepia(1) saturate(2.5) hue-rotate(var(--image-hue, 90deg));
 }
 
 /* Forest palette - keep original green */
 :root[data-palette="forest"] .spline-themed,
 :root:not([data-palette]) .spline-themed {
   filter: none;
-}
-
-/* Ocean - Blue */
-:root[data-palette="ocean"] .spline-themed {
-  filter: grayscale(1) brightness(1.1) sepia(1) saturate(3) hue-rotate(180deg);
-}
-
-/* Sunset - Orange */
-:root[data-palette="sunset"] .spline-themed {
-  filter: grayscale(1) brightness(1.1) sepia(1) saturate(2.5) hue-rotate(-10deg);
-}
-
-/* Lavender - Purple */
-:root[data-palette="lavender"] .spline-themed {
-  filter: grayscale(1) brightness(0.9) sepia(1) saturate(5) hue-rotate(250deg);
 }
 
 /* Monochrome - Gray */
