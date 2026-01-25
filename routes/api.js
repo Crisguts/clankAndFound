@@ -298,4 +298,60 @@ router.patch("/match/:id", async (req, res) => {
   }
 });
 
+// GET /api/inquiries - List all inquiries with match counts
+router.get("/inquiries", async (req, res) => {
+  try {
+    const { status, limit = 50, offset = 0 } = req.query;
+
+    // Build query
+    let query = supabase
+      .from('inquiries')
+      .select('*', { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range(parseInt(offset), parseInt(offset) + parseInt(limit) - 1);
+
+    if (status) {
+      query = query.eq('status', status);
+    }
+
+    const { data: inquiries, error, count } = await query;
+
+    if (error) throw error;
+
+    // Enrich with match counts
+    const enrichedInquiries = await Promise.all(
+      (inquiries || []).map(async (inquiry) => {
+        const { count: pendingCount } = await supabase
+          .from('matches')
+          .select('*', { count: 'exact', head: true })
+          .eq('inquiry_id', inquiry.id)
+          .eq('status', 'pending');
+
+        const { count: confirmedCount } = await supabase
+          .from('matches')
+          .select('*', { count: 'exact', head: true })
+          .eq('inquiry_id', inquiry.id)
+          .eq('status', 'confirmed');
+
+        return {
+          ...inquiry,
+          match_counts: {
+            pending: pendingCount || 0,
+            confirmed: confirmedCount || 0
+          }
+        };
+      })
+    );
+
+    res.status(200).json({
+      message: "Inquiries retrieved successfully",
+      data: enrichedInquiries,
+      total: count || 0
+    });
+  } catch (error) {
+    console.error("Error fetching inquiries:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
