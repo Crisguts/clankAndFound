@@ -1,8 +1,7 @@
 "use client"
 
 import React from "react"
-
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import Header from "@/components/header"
 import { Button } from "@/components/ui/button"
 import {
@@ -14,9 +13,10 @@ import {
   X,
   Package,
   Clock,
-  CheckCheck
+  CheckCheck,
+  RefreshCw,
+  AlertCircle
 } from "lucide-react"
-
 import {
   Select,
   SelectContent,
@@ -24,113 +24,199 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { supabase } from "@/lib/supabase"
+import Link from "next/link"
 
-export type ItemStatus = "active" | "claimed" | "resolved"
+export type ItemStatus = "active" | "claimed" | "archived"
+type ViewTab = "inventory" | "matches" | "inquiries"
 
-export interface InventoryItem {
+// API base URL for Express backend
+const API_BASE = "http://localhost:8080"
+
+interface InventoryItem {
   id: string
-  name: string
   description: string
-  imageUrl: string | null
-  category: string
-  location: string
-  dateAdded: string
-  dateFound: string
+  image_url: string | null
+  location_found: string | null
   status: ItemStatus
-  reportedBy: string
+  created_at: string
+  gemini_data?: any
 }
 
-// Mock inventory data
-const initialInventory: InventoryItem[] = [
-  {
-    id: "1",
-    name: "Blue Backpack",
-    description: "Navy blue backpack with white stripes, contains a water bottle and notebook",
-    imageUrl: "/jack-front.png",
-    category: "Bags",
-    location: "Library - 2nd Floor",
-    dateAdded: "2025-01-20",
-    dateFound: "2025-01-19",
-    status: "active",
-    reportedBy: "Staff Member",
-  },
-  {
-    id: "2",
-    name: "Silver Watch",
-    description: "Men's silver analog watch with leather strap",
-    imageUrl: "/jack-side.png",
-    category: "Accessories",
-    location: "Cafeteria",
-    dateAdded: "2025-01-18",
-    dateFound: "2025-01-18",
-    status: "claimed",
-    reportedBy: "Security",
-  },
-  {
-    id: "3",
-    name: "Set of Keys",
-    description: "5 keys on a red keychain with car remote",
-    imageUrl: "/jack-back.png",
-    category: "Keys",
-    location: "Parking Lot B",
-    dateAdded: "2025-01-15",
-    dateFound: "2025-01-15",
-    status: "resolved",
-    reportedBy: "Visitor",
-  },
-]
+interface Match {
+  id: string
+  score: number
+  status: string
+  admin_notes: string | null
+  inquiry: any
+  inventory: any
+}
+
+interface Inquiry {
+  id: string
+  description: string
+  image_url: string | null
+  status: string
+  created_at: string
+  match_counts?: { pending: number; confirmed: number }
+}
 
 const categories = ["All", "Bags", "Electronics", "Accessories", "Keys", "Clothing", "Documents", "Other"]
 
 export default function AdminPage() {
-  const [inventory, setInventory] = useState<InventoryItem[]>(initialInventory)
+  const [activeTab, setActiveTab] = useState<ViewTab>("inventory")
+  const [inventory, setInventory] = useState<InventoryItem[]>([])
+  const [matches, setMatches] = useState<Match[]>([])
+  const [inquiries, setInquiries] = useState<Inquiry[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [filterStatus, setFilterStatus] = useState<ItemStatus | "all">("all")
-  const [filterCategory, setFilterCategory] = useState("All")
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [user, setUser] = useState<any>(null)
+  const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null)
+  const [stats, setStats] = useState<any>(null)
 
-  // Filter inventory based on search and filters
-  const filteredInventory = inventory.filter((item) => {
-    const matchesSearch =
-      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.location.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesStatus = filterStatus === "all" || item.status === filterStatus
-    const matchesCategory = filterCategory === "All" || item.category === filterCategory
-    return matchesSearch && matchesStatus && matchesCategory
-  })
+  // Check auth and role
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        setUser(null)
+        setIsAuthorized(false)
+        setIsLoading(false)
+        return
+      }
 
-  const handleAddItem = useCallback((newItem: Omit<InventoryItem, "id" | "dateAdded">) => {
-    const item: InventoryItem = {
-      ...newItem,
-      id: Date.now().toString(),
-      dateAdded: new Date().toISOString().split("T")[0],
+      setUser(session.user)
+
+      // Check role via profile
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", session.user.id)
+        .single()
+
+      setIsAuthorized(profile?.role === "assistant")
+      setIsLoading(false)
     }
-    setInventory((prev) => [item, ...prev])
-    setIsAddModalOpen(false)
+
+    checkAuth()
   }, [])
 
-  const handleEditItem = useCallback((updatedItem: InventoryItem) => {
-    setInventory((prev) =>
-      prev.map((item) => (item.id === updatedItem.id ? updatedItem : item))
-    )
-    setEditingItem(null)
+  // Fetch data based on active tab
+  useEffect(() => {
+    if (!isAuthorized) return
+
+    const fetchData = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+
+      const headers = { "Authorization": `Bearer ${session.access_token}` }
+
+      try {
+        if (activeTab === "inventory") {
+          const params = new URLSearchParams()
+          if (searchQuery) params.append("search", searchQuery)
+          if (filterStatus !== "all") params.append("status", filterStatus)
+
+          const res = await fetch(`${API_BASE}/api/inventory?${params}`, { headers })
+          const data = await res.json()
+          if (res.ok) setInventory(data.data || [])
+          else throw new Error(data.error)
+        } else if (activeTab === "matches") {
+          const res = await fetch(`${API_BASE}/api/matches?status=pending`, { headers })
+          const data = await res.json()
+          if (res.ok) setMatches(data.data || [])
+          else throw new Error(data.error)
+        } else if (activeTab === "inquiries") {
+          const res = await fetch(`${API_BASE}/api/inquiries`, { headers })
+          const data = await res.json()
+          if (res.ok) setInquiries(data.data || [])
+          else throw new Error(data.error)
+        }
+
+        // Also fetch stats
+        const statsRes = await fetch(`${API_BASE}/api/stats`, { headers })
+        if (statsRes.ok) {
+          const statsData = await statsRes.json()
+          setStats(statsData.data)
+        }
+      } catch (err: any) {
+        setError(err.message)
+      }
+    }
+
+    fetchData()
+  }, [activeTab, isAuthorized, searchQuery, filterStatus])
+
+  const getAuthHeaders = async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    return { "Authorization": `Bearer ${session?.access_token}` }
+  }
+
+  const handleDeleteItem = useCallback(async (id: string) => {
+    if (!confirm("Are you sure you want to archive this item?")) return
+
+    try {
+      const headers = await getAuthHeaders()
+      const res = await fetch(`${API_BASE}/api/inventory/${id}`, { method: "DELETE", headers })
+      if (!res.ok) throw new Error("Failed to delete")
+      setInventory(prev => prev.filter(item => item.id !== id))
+    } catch (err: any) {
+      setError(err.message)
+    }
   }, [])
 
-  const handleDeleteItem = useCallback((id: string) => {
-    setInventory((prev) => prev.filter((item) => item.id !== id))
+  const handleResolveItem = useCallback(async (id: string) => {
+    try {
+      const headers = await getAuthHeaders()
+      const res = await fetch(`${API_BASE}/api/inventory/${id}`, {
+        method: "PATCH",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "claimed" })
+      })
+      if (!res.ok) throw new Error("Failed to update")
+      setInventory(prev => prev.map(item =>
+        item.id === id ? { ...item, status: "claimed" as ItemStatus } : item
+      ))
+    } catch (err: any) {
+      setError(err.message)
+    }
   }, [])
 
-  const handleResolveItem = useCallback((id: string) => {
-    setInventory((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, status: "resolved" as ItemStatus } : item
-      )
-    )
+  const handleConfirmMatch = useCallback(async (matchId: string) => {
+    try {
+      const headers = await getAuthHeaders()
+      const res = await fetch(`${API_BASE}/api/match/${matchId}`, {
+        method: "PATCH",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "confirmed" })
+      })
+      if (!res.ok) throw new Error("Failed to confirm")
+      setMatches(prev => prev.filter(m => m.id !== matchId))
+    } catch (err: any) {
+      setError(err.message)
+    }
   }, [])
 
-  const getStatusBadge = (status: ItemStatus) => {
+  const handleRejectMatch = useCallback(async (matchId: string) => {
+    try {
+      const headers = await getAuthHeaders()
+      const res = await fetch(`${API_BASE}/api/match/${matchId}`, {
+        method: "PATCH",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "rejected" })
+      })
+      if (!res.ok) throw new Error("Failed to reject")
+      setMatches(prev => prev.filter(m => m.id !== matchId))
+    } catch (err: any) {
+      setError(err.message)
+    }
+  }, [])
+
+  const getStatusBadge = (status: string) => {
     switch (status) {
       case "active":
         return (
@@ -146,21 +232,56 @@ export default function AdminPage() {
             Claimed
           </span>
         )
+      case "archived":
       case "resolved":
         return (
           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-sans bg-muted text-muted-foreground">
             <CheckCheck className="h-3 w-3" />
-            Resolved
+            {status}
           </span>
         )
+      default:
+        return <span className="text-xs">{status}</span>
     }
   }
 
-  const stats = {
-    total: inventory.length,
-    active: inventory.filter((i) => i.status === "active").length,
-    claimed: inventory.filter((i) => i.status === "claimed").length,
-    resolved: inventory.filter((i) => i.status === "resolved").length,
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="w-full min-h-screen bg-background flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  // Not authenticated
+  if (!user) {
+    return (
+      <div className="w-full min-h-screen bg-background">
+        <Header />
+        <main className="max-w-xl mx-auto pt-32 px-4 text-center">
+          <AlertCircle className="h-16 w-16 text-destructive mx-auto mb-4" />
+          <h1 className="text-2xl font-bold mb-2">Login Required</h1>
+          <p className="text-muted-foreground mb-6">Please sign in to access the admin dashboard.</p>
+          <Button asChild><Link href="/sign-in">Sign In</Link></Button>
+        </main>
+      </div>
+    )
+  }
+
+  // Not authorized (not assistant)
+  if (!isAuthorized) {
+    return (
+      <div className="w-full min-h-screen bg-background">
+        <Header />
+        <main className="max-w-xl mx-auto pt-32 px-4 text-center">
+          <AlertCircle className="h-16 w-16 text-destructive mx-auto mb-4" />
+          <h1 className="text-2xl font-bold mb-2">Access Denied</h1>
+          <p className="text-muted-foreground mb-6">You need assistant privileges to access this page.</p>
+          <Button asChild variant="outline"><Link href="/">Go Home</Link></Button>
+        </main>
+      </div>
+    )
   }
 
   return (
@@ -174,23 +295,52 @@ export default function AdminPage() {
             Admin Dashboard
           </h1>
           <p className="text-muted-foreground font-sans text-sm">
-            Manage lost and found inventory - search, add, edit, and resolve items
+            Manage lost and found inventory, review matches, and track inquiries
           </p>
         </div>
 
+        {/* Error Display */}
+        {error && (
+          <div className="mb-6 p-4 bg-destructive/10 border border-destructive/30 rounded-lg text-destructive flex items-center gap-2">
+            <AlertCircle className="h-4 w-4" />
+            {error}
+            <button onClick={() => setError(null)} className="ml-auto"><X className="h-4 w-4" /></button>
+          </div>
+        )}
+
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <StatCard label="Total Items" value={stats.total} />
-          <StatCard label="Active" value={stats.active} color="primary" />
-          <StatCard label="Claimed" value={stats.claimed} color="yellow" />
-          <StatCard label="Resolved" value={stats.resolved} color="muted" />
+        {stats && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <StatCard label="Active Items" value={stats.inventory?.active || 0} color="primary" />
+            <StatCard label="Pending Matches" value={stats.matches?.pending_review || 0} color="yellow" />
+            <StatCard label="Today's Inquiries" value={stats.inquiries?.today || 0} />
+            <StatCard label="Resolved" value={stats.inquiries?.resolved || 0} color="muted" />
+          </div>
+        )}
+
+        {/* Tab Navigation */}
+        <div className="flex gap-2 mb-6">
+          {(["inventory", "matches", "inquiries"] as ViewTab[]).map((tab) => (
+            <Button
+              key={tab}
+              variant={activeTab === tab ? "default" : "outline"}
+              onClick={() => setActiveTab(tab)}
+              className="capitalize"
+            >
+              {tab}
+              {tab === "matches" && stats?.matches?.pending_review > 0 && (
+                <span className="ml-2 px-2 py-0.5 bg-yellow-500 text-yellow-950 text-xs rounded-full">
+                  {stats.matches.pending_review}
+                </span>
+              )}
+            </Button>
+          ))}
         </div>
 
-        {/* Controls */}
-        <div className="bg-surface-1 rounded-2xl p-2 mb-6">
-          <div className="bg-surface-2 rounded-xl p-4 border border-border">
-            <div className="flex flex-col md:flex-row gap-4">
-              {/* Search */}
+        {/* Search Controls */}
+        {activeTab === "inventory" && (
+          <div className="bg-surface-1 rounded-2xl p-2 mb-6">
+            <div className="bg-surface-2 rounded-xl p-4 border border-border flex flex-col md:flex-row gap-4">
               <div className="flex-1 relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <input
@@ -201,156 +351,147 @@ export default function AdminPage() {
                   className="w-full bg-surface-3 border border-border-raised rounded-lg py-2 pl-10 pr-4 text-foreground placeholder:text-muted-foreground font-sans text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
                 />
               </div>
-
-              {/* Status Filter */}
-              <div className="w-full md:w-[180px]">
-                <Select
-                  value={filterStatus}
-                  onValueChange={(value) => setFilterStatus(value as ItemStatus | "all")}
-                >
-                  <SelectTrigger className="w-full bg-surface-3 border-border-raised text-foreground font-sans text-sm">
-                    <SelectValue placeholder="All Status" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-surface-3 border-border-raised text-foreground">
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="claimed">Claimed</SelectItem>
-                    <SelectItem value="resolved">Resolved</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Category Filter */}
-              <div className="w-full md:w-[180px]">
-                <Select
-                  value={filterCategory}
-                  onValueChange={setFilterCategory}
-                >
-                  <SelectTrigger className="w-full bg-surface-3 border-border-raised text-foreground font-sans text-sm">
-                    <SelectValue placeholder="All Categories" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-surface-3 border-border-raised text-foreground">
-                    {categories.map((cat) => (
-                      <SelectItem key={cat} value={cat}>
-                        {cat}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Add Button */}
-              <Button
-                onClick={() => setIsAddModalOpen(true)}
-                className="bg-primary text-primary-foreground rounded-lg px-4 py-2 font-sans transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_rgba(29,237,131,0.5)]"
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Add Item
-              </Button>
+              <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as ItemStatus | "all")}>
+                <SelectTrigger className="w-full md:w-[180px] bg-surface-3 border-border-raised">
+                  <SelectValue placeholder="All Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="claimed">Claimed</SelectItem>
+                  <SelectItem value="archived">Archived</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
-        </div>
+        )}
 
-        {/* Inventory Table */}
-        <div className="bg-surface-1 rounded-2xl p-2">
-          <div className="bg-surface-2 rounded-xl border border-border overflow-hidden">
-            <div className="overflow-x-auto">
+        {/* Inventory Tab */}
+        {activeTab === "inventory" && (
+          <div className="bg-surface-1 rounded-2xl p-2">
+            <div className="bg-surface-2 rounded-xl border border-border overflow-hidden">
               <table className="w-full">
                 <thead>
                   <tr className="bg-surface-3 border-b border-border">
-                    <th className="text-left py-3 px-4 font-sans text-xs text-muted-foreground uppercase tracking-wider">Item</th>
-                    <th className="text-left py-3 px-4 font-sans text-xs text-muted-foreground uppercase tracking-wider hidden md:table-cell">Category</th>
-                    <th className="text-left py-3 px-4 font-sans text-xs text-muted-foreground uppercase tracking-wider hidden lg:table-cell">Location</th>
-                    <th className="text-left py-3 px-4 font-sans text-xs text-muted-foreground uppercase tracking-wider hidden md:table-cell">Date Found</th>
-                    <th className="text-left py-3 px-4 font-sans text-xs text-muted-foreground uppercase tracking-wider">Status</th>
-                    <th className="text-right py-3 px-4 font-sans text-xs text-muted-foreground uppercase tracking-wider">Actions</th>
+                    <th className="text-left py-3 px-4 font-sans text-xs text-muted-foreground uppercase">Item</th>
+                    <th className="text-left py-3 px-4 font-sans text-xs text-muted-foreground uppercase hidden md:table-cell">Location</th>
+                    <th className="text-left py-3 px-4 font-sans text-xs text-muted-foreground uppercase hidden md:table-cell">Date Added</th>
+                    <th className="text-left py-3 px-4 font-sans text-xs text-muted-foreground uppercase">Status</th>
+                    <th className="text-right py-3 px-4 font-sans text-xs text-muted-foreground uppercase">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredInventory.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="py-12 text-center text-muted-foreground font-sans">
-                        No items found
+                  {inventory.length === 0 ? (
+                    <tr><td colSpan={5} className="py-12 text-center text-muted-foreground">No items found</td></tr>
+                  ) : inventory.map((item) => (
+                    <tr key={item.id} className="border-b border-border last:border-0 hover:bg-surface-3/50">
+                      <td className="py-4 px-4">
+                        <div className="flex items-center gap-3">
+                          {item.image_url && (
+                            <img src={item.image_url} alt="" className="w-10 h-10 rounded-lg object-cover bg-surface-3" />
+                          )}
+                          <div>
+                            <p className="font-medium text-foreground line-clamp-1">{item.description?.slice(0, 50)}...</p>
+                            <p className="text-xs text-muted-foreground">{item.gemini_data?.category || "Uncategorized"}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-4 px-4 hidden md:table-cell text-sm text-muted-foreground">{item.location_found || "-"}</td>
+                      <td className="py-4 px-4 hidden md:table-cell text-sm text-muted-foreground">{new Date(item.created_at).toLocaleDateString()}</td>
+                      <td className="py-4 px-4">{getStatusBadge(item.status)}</td>
+                      <td className="py-4 px-4">
+                        <div className="flex items-center justify-end gap-2">
+                          {item.status === "active" && (
+                            <button onClick={() => handleResolveItem(item.id)} className="p-2 rounded-lg hover:bg-primary/20 text-muted-foreground hover:text-primary" title="Mark Claimed">
+                              <CheckCircle className="h-4 w-4" />
+                            </button>
+                          )}
+                          <button onClick={() => handleDeleteItem(item.id)} className="p-2 rounded-lg hover:bg-destructive/20 text-muted-foreground hover:text-destructive" title="Archive">
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
-                  ) : (
-                    filteredInventory.map((item) => (
-                      <tr key={item.id} className="border-b border-border last:border-0 hover:bg-surface-3/50 transition-colors">
-                        <td className="py-4 px-4">
-                          <div className="flex items-center gap-3">
-                            {item.imageUrl && (
-                              <img
-                                src={item.imageUrl || "/placeholder.svg"}
-                                alt={item.name}
-                                className="w-10 h-10 rounded-lg object-cover bg-surface-3"
-                              />
-                            )}
-                            <div>
-                              <p className="font-medium text-foreground">{item.name}</p>
-                              <p className="text-xs text-muted-foreground font-sans line-clamp-1 max-w-[200px]">
-                                {item.description}
-                              </p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-4 px-4 hidden md:table-cell">
-                          <span className="text-sm text-foreground font-sans">{item.category}</span>
-                        </td>
-                        <td className="py-4 px-4 hidden lg:table-cell">
-                          <span className="text-sm text-muted-foreground font-sans">{item.location}</span>
-                        </td>
-                        <td className="py-4 px-4 hidden md:table-cell">
-                          <span className="text-sm text-muted-foreground font-sans">{item.dateFound}</span>
-                        </td>
-                        <td className="py-4 px-4">{getStatusBadge(item.status)}</td>
-                        <td className="py-4 px-4">
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              onClick={() => setEditingItem(item)}
-                              className="p-2 rounded-lg hover:bg-surface-3 text-muted-foreground hover:text-foreground transition-colors"
-                              title="Edit"
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </button>
-                            {item.status !== "resolved" && (
-                              <button
-                                onClick={() => handleResolveItem(item.id)}
-                                className="p-2 rounded-lg hover:bg-primary/20 text-muted-foreground hover:text-primary transition-colors"
-                                title="Mark as Resolved"
-                              >
-                                <CheckCircle className="h-4 w-4" />
-                              </button>
-                            )}
-                            <button
-                              onClick={() => handleDeleteItem(item.id)}
-                              className="p-2 rounded-lg hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
-                              title="Delete"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
+                  ))}
                 </tbody>
               </table>
             </div>
           </div>
-        </div>
-      </main>
+        )}
 
-      {/* Add/Edit Modal */}
-      {(isAddModalOpen || editingItem) && (
-        <ItemModal
-          item={editingItem}
-          onSave={editingItem ? handleEditItem : handleAddItem}
-          onClose={() => {
-            setIsAddModalOpen(false)
-            setEditingItem(null)
-          }}
-        />
-      )}
+        {/* Matches Tab */}
+        {activeTab === "matches" && (
+          <div className="space-y-4">
+            {matches.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">No pending matches to review</div>
+            ) : matches.map((match) => (
+              <div key={match.id} className="bg-surface-1 rounded-2xl p-2">
+                <div className="bg-surface-2 rounded-xl border border-border p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-sm text-muted-foreground">Match Score: <strong className="text-primary">{(match.score * 100).toFixed(0)}%</strong></span>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" onClick={() => handleRejectMatch(match.id)}>Reject</Button>
+                      <Button size="sm" onClick={() => handleConfirmMatch(match.id)}>Confirm Match</Button>
+                    </div>
+                  </div>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="bg-surface-3 rounded-lg p-4 border border-border-raised">
+                      <p className="text-xs text-muted-foreground mb-2">User's Lost Item</p>
+                      {match.inquiry?.image_url && <img src={match.inquiry.image_url} alt="" className="w-full h-32 object-cover rounded-lg mb-2" />}
+                      <p className="text-sm">{match.inquiry?.description}</p>
+                    </div>
+                    <div className="bg-surface-3 rounded-lg p-4 border border-border-raised">
+                      <p className="text-xs text-muted-foreground mb-2">Found Item</p>
+                      {match.inventory?.image_url && <img src={match.inventory.image_url} alt="" className="w-full h-32 object-cover rounded-lg mb-2" />}
+                      <p className="text-sm">{match.inventory?.description}</p>
+                    </div>
+                  </div>
+                  {match.admin_notes && <p className="text-xs text-muted-foreground mt-4">AI Notes: {match.admin_notes}</p>}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Inquiries Tab */}
+        {activeTab === "inquiries" && (
+          <div className="bg-surface-1 rounded-2xl p-2">
+            <div className="bg-surface-2 rounded-xl border border-border overflow-hidden">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-surface-3 border-b border-border">
+                    <th className="text-left py-3 px-4 font-sans text-xs text-muted-foreground uppercase">Inquiry</th>
+                    <th className="text-left py-3 px-4 font-sans text-xs text-muted-foreground uppercase hidden md:table-cell">Date</th>
+                    <th className="text-left py-3 px-4 font-sans text-xs text-muted-foreground uppercase">Status</th>
+                    <th className="text-left py-3 px-4 font-sans text-xs text-muted-foreground uppercase">Matches</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {inquiries.length === 0 ? (
+                    <tr><td colSpan={4} className="py-12 text-center text-muted-foreground">No inquiries found</td></tr>
+                  ) : inquiries.map((inq) => (
+                    <tr key={inq.id} className="border-b border-border last:border-0 hover:bg-surface-3/50">
+                      <td className="py-4 px-4">
+                        <div className="flex items-center gap-3">
+                          {inq.image_url && <img src={inq.image_url} alt="" className="w-10 h-10 rounded-lg object-cover" />}
+                          <p className="text-sm line-clamp-2">{inq.description?.slice(0, 80)}...</p>
+                        </div>
+                      </td>
+                      <td className="py-4 px-4 hidden md:table-cell text-sm text-muted-foreground">{new Date(inq.created_at).toLocaleDateString()}</td>
+                      <td className="py-4 px-4">{getStatusBadge(inq.status)}</td>
+                      <td className="py-4 px-4">
+                        <span className="text-xs">
+                          {inq.match_counts?.pending || 0} pending, {inq.match_counts?.confirmed || 0} confirmed
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </main>
     </div>
   )
 }
@@ -364,168 +505,6 @@ function StatCard({ label, value, color }: { label: string; value: number; color
       <div className={`${bgClass} rounded-lg p-4 border border-border`}>
         <p className="text-muted-foreground font-sans text-xs mb-1">{label}</p>
         <p className={`text-2xl font-bold ${textClass}`}>{value}</p>
-      </div>
-    </div>
-  )
-}
-
-interface ItemModalProps {
-  item: InventoryItem | null
-  onSave: (item: any) => void
-  onClose: () => void
-}
-
-function ItemModal({ item, onSave, onClose }: ItemModalProps) {
-  const [formData, setFormData] = useState({
-    name: item?.name || "",
-    description: item?.description || "",
-    imageUrl: item?.imageUrl || "",
-    category: item?.category || "Other",
-    location: item?.location || "",
-    dateFound: item?.dateFound || new Date().toISOString().split("T")[0],
-    status: item?.status || "active",
-    reportedBy: item?.reportedBy || "",
-  })
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (item) {
-      onSave({ ...item, ...formData })
-    } else {
-      onSave(formData)
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-surface-1 rounded-2xl p-2 w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <div className="bg-surface-2 rounded-xl border border-border p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-bold text-foreground" style={{ fontFamily: "var(--font-geist-sans)" }}>
-              {item ? "Edit Item" : "Add New Item"}
-            </h2>
-            <button
-              onClick={onClose}
-              className="p-2 rounded-lg hover:bg-surface-3 text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-sans text-muted-foreground mb-1">Item Name</label>
-              <input
-                type="text"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                required
-                className="w-full bg-surface-3 border border-border-raised rounded-lg py-2 px-3 text-foreground font-sans text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-sans text-muted-foreground mb-1">Description</label>
-              <textarea
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                required
-                rows={3}
-                className="w-full bg-surface-3 border border-border-raised rounded-lg py-2 px-3 text-foreground font-sans text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-sans text-muted-foreground mb-1">Category</label>
-                <Select
-                  value={formData.category}
-                  onValueChange={(value) => setFormData({ ...formData, category: value })}
-                >
-                  <SelectTrigger className="w-full bg-surface-3 border-border-raised text-foreground font-sans text-sm">
-                    <SelectValue placeholder="Select Category" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-surface-3 border-border-raised text-foreground">
-                    {categories.slice(1).map((cat) => (
-                      <SelectItem key={cat} value={cat}>
-                        {cat}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-sans text-muted-foreground mb-1">Status</label>
-                <Select
-                  value={formData.status}
-                  onValueChange={(value) => setFormData({ ...formData, status: value as ItemStatus })}
-                >
-                  <SelectTrigger className="w-full bg-surface-3 border-border-raised text-foreground font-sans text-sm">
-                    <SelectValue placeholder="Select Status" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-surface-3 border-border-raised text-foreground">
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="claimed">Claimed</SelectItem>
-                    <SelectItem value="resolved">Resolved</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-sans text-muted-foreground mb-1">Location Found</label>
-              <input
-                type="text"
-                value={formData.location}
-                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                required
-                className="w-full bg-surface-3 border border-border-raised rounded-lg py-2 px-3 text-foreground font-sans text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-sans text-muted-foreground mb-1">Date Found</label>
-                <input
-                  type="date"
-                  value={formData.dateFound}
-                  onChange={(e) => setFormData({ ...formData, dateFound: e.target.value })}
-                  required
-                  className="w-full bg-surface-3 border border-border-raised rounded-lg py-2 px-3 text-foreground font-sans text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-sans text-muted-foreground mb-1">Reported By</label>
-                <input
-                  type="text"
-                  value={formData.reportedBy}
-                  onChange={(e) => setFormData({ ...formData, reportedBy: e.target.value })}
-                  className="w-full bg-surface-3 border border-border-raised rounded-lg py-2 px-3 text-foreground font-sans text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-3 pt-4">
-              <Button
-                type="button"
-                onClick={onClose}
-                variant="outline"
-                className="flex-1 rounded-lg bg-transparent"
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                className="flex-1 bg-primary text-primary-foreground rounded-lg transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_rgba(29,237,131,0.5)]"
-              >
-                {item ? "Save Changes" : "Add Item"}
-              </Button>
-            </div>
-          </form>
-        </div>
       </div>
     </div>
   )

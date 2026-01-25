@@ -32,7 +32,19 @@ export default function SignInPage() {
       if (error) throw error
 
       if (data.user) {
-        window.location.href = "/"
+        // Fetch user role from profiles
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", data.user.id)
+          .single()
+
+        // Redirect based on role
+        if (profile?.role === "assistant") {
+          window.location.href = "/admin"
+        } else {
+          window.location.href = "/search"
+        }
       }
     } catch (error: any) {
       setError(error.message || "An error occurred during sign in")

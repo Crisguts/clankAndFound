@@ -7,7 +7,7 @@ import { Upload, X, ImageIcon } from "lucide-react"
 
 interface ImageUploadProps {
   uploadedImage: string | null
-  onImageUpload: (imageUrl: string | null) => void
+  onImageUpload: (imageUrl: string | null, file?: File) => void
   disabled?: boolean
 }
 
@@ -34,7 +34,7 @@ export function ImageUpload({ uploadedImage, onImageUpload, disabled }: ImageUpl
     if (file && file.type.startsWith("image/")) {
       const reader = new FileReader()
       reader.onload = (event) => {
-        onImageUpload(event.target?.result as string)
+        onImageUpload(event.target?.result as string, file)
       }
       reader.readAsDataURL(file)
     }
@@ -45,14 +45,14 @@ export function ImageUpload({ uploadedImage, onImageUpload, disabled }: ImageUpl
     if (file && file.type.startsWith("image/")) {
       const reader = new FileReader()
       reader.onload = (event) => {
-        onImageUpload(event.target?.result as string)
+        onImageUpload(event.target?.result as string, file)
       }
       reader.readAsDataURL(file)
     }
   }, [onImageUpload])
 
   const handleRemove = useCallback(() => {
-    onImageUpload(null)
+    onImageUpload(null, undefined)
   }, [onImageUpload])
 
   if (uploadedImage) {
@@ -101,8 +101,8 @@ export function ImageUpload({ uploadedImage, onImageUpload, disabled }: ImageUpl
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
             className={`relative border-2 border-dashed rounded-lg p-8 text-center transition-all bg-surface-3 ${isDragging
-                ? "border-primary bg-primary/5"
-                : "border-border-raised hover:border-primary/50"
+              ? "border-primary bg-primary/5"
+              : "border-border-raised hover:border-primary/50"
               } ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
           >
             <input

@@ -1,25 +1,18 @@
-const { analyzeImage, verifyMatch } = require("./gemini");
+const { verifyMatch } = require("./gemini");
 const supabase = require("./supabase");
 
 /**
- * Finds potential matches for a new inquiry by searching the inventory
- * using full-text search on the keywords provided.
- *
- * @param {string} inquiryId - The UUID of the newly created inquiry
- * @param {string} searchString - Comma-separated keywords or description from Gemini
+ * Finds potential matches for a new inquiry by searching the inventory.
+ * Called when a user reports a LOST item.
  */
 async function findMatchesForInquiry(inquiryId, searchString) {
-  console.log(`[Matching] Starting match process for Inquiry ID: ${inquiryId}`);
+  console.log(`[Matching] Starting match for Inquiry ID: ${inquiryId}`);
 
-  if (!searchString || !searchString.trim()) {
+  if (!searchString?.trim()) {
     console.log("[Matching] No search string provided. Skipping.");
     return;
   }
 
-  // 1. Prepare the query
-  // Gemini returns "keyword1, keyword2, keyword3".
-  // for 'websearch', we can transform this to "keyword1 OR keyword2 OR keyword3"
-  // to maximize recall (finding anything matching at least one property).
   const formattedQuery = searchString
     .split(",")
     .map((k) => k.trim())
@@ -28,14 +21,10 @@ async function findMatchesForInquiry(inquiryId, searchString) {
 
   console.log(`[Matching] Searching inventory with query: "${formattedQuery}"`);
 
-  // 2. Search Inventory (Active items only) using RPC for Scoring
+  // Search Inventory using RPC
   const { data: potentialMatches, error: searchError } = await supabase.rpc(
     "match_inventory",
-    {
-      query_text: formattedQuery,
-      match_threshold: 0.01, // Low threshold for demo
-      match_count: 5, // Top 5
-    },
+    { query_text: formattedQuery, match_threshold: 0.01, match_count: 5 }
   );
 
   if (searchError) {
@@ -43,86 +32,107 @@ async function findMatchesForInquiry(inquiryId, searchString) {
     return;
   }
 
-  console.log(`[Matching] Found ${potentialMatches.length} potential matches.`);
+  console.log(`[Matching] Found ${potentialMatches?.length || 0} potential matches.`);
 
-  if (potentialMatches.length === 0) {
-    return;
-  }
+  if (!potentialMatches || potentialMatches.length === 0) return;
 
-  // 3. Verify matches with Gemini (AI Layer)
+  // Verify with Gemini and create match records
   const matchRecords = [];
-
   for (const item of potentialMatches) {
     try {
-      console.log(`[Matching] Verifying candidate: ${item.id} with Gemini...`);
-      // We compare the Search String (Inquiry) vs Item Description (Inventory)
-      // In a real app, we might fetch the full inquiry text first if searchString is just keywords.
-      // Assuming searchString is descriptive enough for now.
+      console.log(`[Matching] Verifying inventory ${item.id}...`);
       const verification = await verifyMatch(searchString, item.description);
 
-      console.log(
-        `   -> Gemini Result: IsMatch=${verification.is_match}, Conf=${verification.confidence}`,
-      );
-
-      // If confidence is high, boost score. If low, penalize or drop?
-      // Let's use Gemini confidence as the primary score if it's a match.
-      // If Gemini says NOT a match, we can still keep it but with low score, or filter it out.
-      // For this demo, let's keep everything but update score/notes.
-
-      let finalScore = item.rank;
-      if (verification.is_match) {
-        finalScore = Math.max(item.rank, verification.confidence); // Boost
-      } else {
-        finalScore = item.rank * 0.1; // Penalize heavy
-      }
+      const score = verification.is_match
+        ? Math.max(item.rank, verification.confidence)
+        : item.rank * 0.1;
 
       matchRecords.push({
         inquiry_id: inquiryId,
         inventory_id: item.id,
         status: "pending",
-        score: finalScore,
-        admin_notes: `AI Verification: ${verification.reasoning} (Confidence: ${verification.confidence})`,
+        score,
+        admin_notes: `AI: ${verification.reasoning} (${verification.confidence})`,
       });
     } catch (err) {
-      console.error(
-        `[Matching] Gemini Verification Failed for ${item.id}:`,
-        err,
-      );
-      // Fallback to DB rank
+      console.error(`[Matching] Gemini failed for ${item.id}:`, err);
       matchRecords.push({
         inquiry_id: inquiryId,
         inventory_id: item.id,
         status: "pending",
         score: item.rank,
-        admin_notes: `Auto-matched via keywords. AI Verification failed.`,
+        admin_notes: "Auto-matched. AI verification failed.",
       });
     }
   }
 
-  // 4. Insert into 'matches' table
-  // Filter out low scores
-  const MIN_SCORE_THRESHOLD = 0.5;
-  const validMatches = matchRecords.filter(
-    (m) => m.score >= MIN_SCORE_THRESHOLD,
-  );
-
+  // Insert valid matches
+  const validMatches = matchRecords.filter((m) => m.score >= 0.5);
   if (validMatches.length > 0) {
-    const { error: insertError } = await supabase
-      .from("matches")
-      .insert(validMatches);
-
-    if (insertError) {
-      console.error("[Matching] Error inserting matches:", insertError);
-    } else {
-      console.log(
-        `[Matching] Successfully created ${validMatches.length} match entries (Filtered from ${matchRecords.length}).`,
-      );
-    }
+    const { error } = await supabase.from("matches").insert(validMatches);
+    if (error) console.error("[Matching] Insert error:", error);
+    else console.log(`[Matching] Created ${validMatches.length} matches.`);
   } else {
-    console.log(
-      `[Matching] No matches above threshold (${MIN_SCORE_THRESHOLD}).`,
-    );
+    console.log("[Matching] No matches above threshold.");
   }
 }
 
-module.exports = { findMatchesForInquiry };
+/**
+ * Finds potential matches for a new inventory item by searching existing inquiries.
+ * Called when assistant adds a FOUND item.
+ */
+async function findMatchesForInventoryItem(inventoryId, searchString) {
+  console.log(`[Matching] Starting reverse match for Inventory ID: ${inventoryId}`);
+
+  if (!searchString?.trim()) {
+    console.log("[Matching] No search string provided. Skipping.");
+    return;
+  }
+
+  // Get all open inquiries
+  const { data: inquiries, error } = await supabase
+    .from("inquiries")
+    .select("*")
+    .in("status", ["submitted", "under_review"])
+    .order("created_at", { ascending: false })
+    .limit(50);
+
+  if (error) {
+    console.error("[Matching] Error fetching inquiries:", error);
+    return;
+  }
+
+  console.log(`[Matching] Checking ${inquiries?.length || 0} open inquiries.`);
+  if (!inquiries || inquiries.length === 0) return;
+
+  // Verify each inquiry with Gemini
+  const matchRecords = [];
+  for (const inquiry of inquiries) {
+    try {
+      console.log(`[Matching] Verifying inquiry ${inquiry.id}...`);
+      const verification = await verifyMatch(searchString, inquiry.description);
+
+      if (verification.is_match && verification.confidence >= 0.5) {
+        matchRecords.push({
+          inquiry_id: inquiry.id,
+          inventory_id: inventoryId,
+          status: "pending",
+          score: verification.confidence,
+          admin_notes: `AI Match: ${verification.reasoning}`,
+        });
+      }
+    } catch (err) {
+      console.error(`[Matching] Gemini failed for inquiry ${inquiry.id}:`, err);
+    }
+  }
+
+  if (matchRecords.length > 0) {
+    const { error } = await supabase.from("matches").insert(matchRecords);
+    if (error) console.error("[Matching] Insert error:", error);
+    else console.log(`[Matching] Created ${matchRecords.length} matches from inventory.`);
+  } else {
+    console.log("[Matching] No matching inquiries found.");
+  }
+}
+
+module.exports = { findMatchesForInquiry, findMatchesForInventoryItem };

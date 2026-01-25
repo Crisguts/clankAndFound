@@ -77,8 +77,8 @@ export default function Home() {
                       <button className="bg-primary text-primary-foreground px-8 py-4 rounded-full font-semibold text-lg whitespace-nowrap hover:scale-105 hover:shadow-[0_0_20px_var(--primary)] transition-all duration-300 font-sans flex items-center gap-2">
                         <Search className="h-5 w-5" />
                         Start Searching
-                      </Link>
-                    </Button>
+                      </button>
+                    </Link>
                   </div>
 
                   {/* Right illustration */}
