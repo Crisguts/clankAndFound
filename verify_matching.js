@@ -2,97 +2,122 @@ require("dotenv").config();
 const supabase = require("./services/supabase");
 const { findMatchesForInquiry } = require("./services/matching");
 
-async function testMatching() {
-  console.log("--- Starting Matching Verification ---");
-
-  // 1. Create a dummy FOUND item (Inventory)
-  // "Red Canon Camera"
-  const uniqueId = Math.random().toString(36).substr(2, 5);
-  const inventoryDesc = `Found a red Canon EOS camera with a black lens cap in the cafeteria. ID: ${uniqueId}`;
-
-  console.log(`1. Creating Inventory Item: "${inventoryDesc}"`);
-  const { data: invData, error: invError } = await supabase
+async function createInventoryItem(description) {
+  const { data, error } = await supabase
     .from("inventory")
-    .insert([
-      {
-        description: inventoryDesc,
-        status: "active",
-        // image_url: ... (optional)
-      },
-    ])
+    .insert([{ description, status: "active" }])
     .select()
     .single();
-
-  if (invError) {
-    console.error("Failed to create inventory item:", invError);
-    return;
-  }
-  console.log("   -> Inventory Item Created:", invData.id);
-
-  // 2. Create a dummy LOST item (Inquiry)
-  // "Lost Canon Camera"
-  const inquiryDesc = `I lost my Canon camera. It is red.`;
-  const keywords = "Canon, camera, red"; // Simulate Gemini keywords
-
-  console.log(
-    `2. Creating Inquiry: "${inquiryDesc}" with keywords: "${keywords}"`,
-  );
-  const { data: inqData, error: inqError } = await supabase
-    .from("inquiries")
-    .insert([
-      {
-        description: inquiryDesc,
-        status: "submitted",
-        gemini_data: { keywords: keywords },
-      },
-    ])
-    .select()
-    .single();
-
-  if (inqError) {
-    console.error("Failed to create inquiry:", inqError);
-    return;
-  }
-  console.log("   -> Inquiry Created:", inqData.id);
-
-  // 3. Trigger Matching Manually (calling the service function directly for test)
-  console.log("3. Triggering Match Logic...");
-  await findMatchesForInquiry(inqData.id, keywords);
-
-  // 4. Verify Match
-  console.log("4. Verifying Match Execution...");
-
-  // Give DB a moment? No, await should handle it.
-
-  const { data: matches, error: matchError } = await supabase
-    .from("matches")
-    .select("*")
-    .eq("inquiry_id", inqData.id);
-
-  if (matchError) {
-    console.error("Error fetching matches:", matchError);
-  } else {
-    console.log(`   -> Found ${matches.length} matches for this inquiry.`);
-    if (matches.length > 0) {
-      console.log("   SUCCESS! Matches found:", matches);
-      const verified = matches.some((m) => m.inventory_id === invData.id);
-      if (verified) {
-        console.log("   ✅ Specific inventory item was correctly matched!");
-      } else {
-        console.log(
-          "   ⚠️ Match found but not the one we just created? (Possible if other items exist)",
-        );
-      }
-    } else {
-      console.log(
-        "   ❌ No matches found. Text search might need tuning or index update delay.",
-      );
-    }
-  }
-
-  // Cleanup (Optional)
-  // await supabase.from('inventory').delete().eq('id', invData.id);
-  // await supabase.from('inquiries').delete().eq('id', inqData.id);
+  if (error) throw error;
+  return data;
 }
 
-testMatching();
+async function createInquiry(description, keywords) {
+  const { data, error } = await supabase
+    .from("inquiries")
+    .insert([{ description, status: "submitted", gemini_data: { keywords } }])
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function runScenario(
+  name,
+  inventoryDesc,
+  inquiryDesc,
+  keywords,
+  expectedMatch = true,
+) {
+  console.log(`\n--- Scenario: ${name} ---`);
+
+  // 1. Setup Inventory
+  const invItem = await createInventoryItem(inventoryDesc);
+  console.log(
+    `Inventory: "${inventoryDesc}" (ID: ${invItem.id.substring(0, 5)}...)`,
+  );
+
+  // 2. Setup Inquiry
+  const inquiry = await createInquiry(inquiryDesc, keywords);
+  console.log(`Inquiry:   "${inquiryDesc}" (Keywords: ${keywords})`);
+
+  // 3. Run Match
+  await findMatchesForInquiry(inquiry.id, keywords);
+
+  // 4. Check Results
+  const { data: matches } = await supabase
+    .from("matches")
+    .select("*, inventory(*)")
+    .eq("inquiry_id", inquiry.id)
+    .order("score", { ascending: false });
+
+  if (matches.length > 0) {
+    console.log(`=> Found ${matches.length} matches.`);
+    matches.forEach((m) => {
+      const isTarget = m.inventory_id === invItem.id;
+      const marker = isTarget ? "✅ TARGET" : "  Other";
+      console.log(
+        `   [${marker}] Score: ${m.score.toFixed(4)} | Item: ${m.inventory.description.substring(0, 40)}...`,
+      );
+    });
+
+    const foundTarget = matches.some((m) => m.inventory_id === invItem.id);
+    if (expectedMatch && foundTarget)
+      console.log("   PASSED: Target item found.");
+    else if (expectedMatch && !foundTarget)
+      console.log("   FAILED: Target item NOT found.");
+    else if (!expectedMatch && foundTarget)
+      console.log("   FAILED: Unexpected match found.");
+    else console.log("   PASSED: No unexpected match.");
+  } else {
+    console.log("=> No matches found.");
+    if (expectedMatch) console.log("   FAILED: Expected a match but got none.");
+    else console.log("   PASSED: Correctly found no matches.");
+  }
+}
+
+async function main() {
+  console.log("Starting Extended Verification...");
+
+  // clear old data? No, let's just add to the pile to test "needle in haystack" slightly.
+
+  try {
+    // Case 1: High Confidence Match (Specific Brand & Color)
+    await runScenario(
+      "Blue Hydroflask",
+      "Found a blue Hydroflask water bottle with stickers on it.",
+      "I lost my blue Hydroflask at the gym.",
+      "blue, Hydroflask, bottle, stickers",
+    );
+
+    // Case 2: Broad Category Match (Generic keys)
+    await runScenario(
+      "Lost Keys",
+      "Found a set of keys with a Toyota car fob.",
+      "Lost my keys somewhere.",
+      "keys, car fob, Toyota",
+    );
+
+    // Case 3: No Match (Completely different)
+    await runScenario(
+      "Mismatch Test",
+      "Found a pair of Rayban sunglasses.",
+      "Lost my winter coat.",
+      "coat, winter, jacket",
+      false, // Expect NO match between these two specifically (though it might match others if DB is dirty)
+    );
+
+    // Case 4: Ambiguous / Low Score
+    await runScenario(
+      "Ambiguous Phone",
+      "Found a black iPhone 12 with a cracked screen.",
+      "Lost a black Samsung Galaxy phone.",
+      "black, phone, Samsung",
+      true, // Might match partially on "black phone", checking score
+    );
+  } catch (e) {
+    console.error("Test failed:", e);
+  }
+}
+
+main();

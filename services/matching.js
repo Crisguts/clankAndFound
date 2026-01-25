@@ -1,3 +1,4 @@
+const { analyzeImage, verifyMatch } = require("./gemini");
 const supabase = require("./supabase");
 
 /**
@@ -48,24 +49,78 @@ async function findMatchesForInquiry(inquiryId, searchString) {
     return;
   }
 
-  // 3. Insert into 'matches' table
-  const matchRecords = potentialMatches.map((item) => ({
-    inquiry_id: inquiryId,
-    inventory_id: item.id,
-    status: "pending",
-    score: item.rank, // Using the score from RPC
-    admin_notes: `Auto-matched via keywords: ${formattedQuery.substring(0, 50)}...`,
-  }));
+  // 3. Verify matches with Gemini (AI Layer)
+  const matchRecords = [];
 
-  const { error: insertError } = await supabase
-    .from("matches")
-    .insert(matchRecords);
+  for (const item of potentialMatches) {
+    try {
+      console.log(`[Matching] Verifying candidate: ${item.id} with Gemini...`);
+      // We compare the Search String (Inquiry) vs Item Description (Inventory)
+      // In a real app, we might fetch the full inquiry text first if searchString is just keywords.
+      // Assuming searchString is descriptive enough for now.
+      const verification = await verifyMatch(searchString, item.description);
 
-  if (insertError) {
-    console.error("[Matching] Error inserting matches:", insertError);
+      console.log(
+        `   -> Gemini Result: IsMatch=${verification.is_match}, Conf=${verification.confidence}`,
+      );
+
+      // If confidence is high, boost score. If low, penalize or drop?
+      // Let's use Gemini confidence as the primary score if it's a match.
+      // If Gemini says NOT a match, we can still keep it but with low score, or filter it out.
+      // For this demo, let's keep everything but update score/notes.
+
+      let finalScore = item.rank;
+      if (verification.is_match) {
+        finalScore = Math.max(item.rank, verification.confidence); // Boost
+      } else {
+        finalScore = item.rank * 0.1; // Penalize heavy
+      }
+
+      matchRecords.push({
+        inquiry_id: inquiryId,
+        inventory_id: item.id,
+        status: "pending",
+        score: finalScore,
+        admin_notes: `AI Verification: ${verification.reasoning} (Confidence: ${verification.confidence})`,
+      });
+    } catch (err) {
+      console.error(
+        `[Matching] Gemini Verification Failed for ${item.id}:`,
+        err,
+      );
+      // Fallback to DB rank
+      matchRecords.push({
+        inquiry_id: inquiryId,
+        inventory_id: item.id,
+        status: "pending",
+        score: item.rank,
+        admin_notes: `Auto-matched via keywords. AI Verification failed.`,
+      });
+    }
+  }
+
+  // 4. Insert into 'matches' table
+  // Filter out low scores
+  const MIN_SCORE_THRESHOLD = 0.5;
+  const validMatches = matchRecords.filter(
+    (m) => m.score >= MIN_SCORE_THRESHOLD,
+  );
+
+  if (validMatches.length > 0) {
+    const { error: insertError } = await supabase
+      .from("matches")
+      .insert(validMatches);
+
+    if (insertError) {
+      console.error("[Matching] Error inserting matches:", insertError);
+    } else {
+      console.log(
+        `[Matching] Successfully created ${validMatches.length} match entries (Filtered from ${matchRecords.length}).`,
+      );
+    }
   } else {
     console.log(
-      `[Matching] Successfully created ${matchRecords.length} match entries.`,
+      `[Matching] No matches above threshold (${MIN_SCORE_THRESHOLD}).`,
     );
   }
 }
