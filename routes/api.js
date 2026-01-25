@@ -94,8 +94,25 @@ router.post("/inquiry", rateLimit, optionalAuth, upload.single("image"), async (
       .select();
 
     if (insertError) {
-      console.error("Supabase Insert Error:", insertError);
-      return res.status(500).json({ error: "Failed to save inquiry" });
+      console.error("Supabase Insert Error (Inquiries):", {
+        message: insertError.message,
+        details: insertError.details,
+        hint: insertError.hint,
+        code: insertError.code
+      });
+      return res.status(500).json({
+        error: "Failed to save inquiry",
+        details: insertError.message,
+        code: insertError.code
+      });
+    }
+
+    if (!insertData || insertData.length === 0) {
+      console.error("Supabase Insert returned no data for inquiries. Check RLS policies.");
+      return res.status(500).json({
+        error: "Failed to retrieve saved inquiry",
+        details: "The database accepted the insert but RLS policies prevented retrieving the result."
+      });
     }
 
     const inquiry = insertData[0];
@@ -177,10 +194,17 @@ router.post("/inventory", rateLimit, optionalAuth, upload.single("image"), async
       .select();
 
     if (insertError) {
-      console.error("Supabase Insert Error:", insertError);
-      return res
-        .status(500)
-        .json({ error: "Failed to save inventory item", details: insertError });
+      console.error("Supabase Insert Error (Inventory):", {
+        message: insertError.message,
+        details: insertError.details,
+        hint: insertError.hint,
+        code: insertError.code
+      });
+      return res.status(500).json({
+        error: "Failed to save inventory item",
+        details: insertError.message,
+        code: insertError.code
+      });
     }
 
     res

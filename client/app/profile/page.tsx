@@ -4,9 +4,17 @@ import React from "react"
 import { useState, useCallback, useEffect } from "react"
 import Header from "@/components/header"
 import { Button } from "@/components/ui/button"
-import { Package, CheckCircle, Clock, AlertCircle, X, MapPin } from "lucide-react"
+import { Package, CheckCircle, Clock, AlertCircle, X, MapPin, Sparkles } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import Link from "next/link"
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog"
 
 const API_BASE = "http://localhost:8080"
 
@@ -42,7 +50,9 @@ export default function ProfilePage() {
     const [matches, setMatches] = useState<Match[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
-    const [activeTab, setActiveTab] = useState<"inquiries" | "matches">("matches")
+    const [activeTab, setActiveTab] = useState<"inquiries" | "matches" | "history">("matches")
+    const [isSuccessDialogOpen, setIsSuccessDialogOpen] = useState(false)
+    const [claimedItemName, setClaimedItemName] = useState("")
 
     useEffect(() => {
         const init = async () => {
@@ -90,7 +100,7 @@ export default function ProfilePage() {
         }
     }
 
-    const handleClaim = useCallback(async (matchId: string) => {
+    const handleClaim = useCallback(async (matchId: string, itemDescription: string) => {
         try {
             const { data: { session } } = await supabase.auth.getSession()
             if (!session) return
@@ -102,8 +112,9 @@ export default function ProfilePage() {
 
             if (!res.ok) throw new Error("Failed to claim")
 
+            setClaimedItemName(itemDescription)
             setMatches(prev => prev.filter(m => m.id !== matchId))
-            alert("Item claimed successfully! Please visit the lost & found office to pick it up.")
+            setIsSuccessDialogOpen(true)
         } catch (err: any) {
             setError(err.message)
         }
@@ -230,7 +241,10 @@ export default function ProfilePage() {
                                         </div>
                                     </div>
 
-                                    <Button onClick={() => handleClaim(match.id)} className="w-full">
+                                    <Button
+                                        onClick={() => handleClaim(match.id, match.inventory.description)}
+                                        className="w-full bg-primary text-primary-foreground hover:scale-[1.02] transition-transform"
+                                    >
                                         <CheckCircle className="h-4 w-4 mr-2" />
                                         Claim This Item
                                     </Button>
@@ -279,6 +293,45 @@ export default function ProfilePage() {
                     </div>
                 )}
             </main>
+
+            <Dialog open={isSuccessDialogOpen} onOpenChange={setIsSuccessDialogOpen}>
+                <DialogContent className="max-w-md bg-surface-1 border-border p-2">
+                    <div className="bg-surface-2 rounded-xl p-6 border border-border">
+                        <DialogHeader>
+                            <div className="flex justify-center mb-6">
+                                <div className="bg-primary/10 p-4 rounded-full relative">
+                                    <Sparkles className="h-8 w-8 text-primary animate-pulse" />
+                                    <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl animate-pulse" />
+                                </div>
+                            </div>
+                            <DialogTitle className="text-2xl font-bold text-center mb-2" style={{ fontFamily: "var(--font-geist-sans)" }}>
+                                Success!
+                            </DialogTitle>
+                            <DialogDescription className="text-center text-muted-foreground text-sm font-sans">
+                                You have successfully claimed the <strong>{claimedItemName || "item"}</strong>.
+                                Bean has notified the staff that you're on your way!
+                            </DialogDescription>
+                        </DialogHeader>
+
+                        <div className="mt-8 space-y-4">
+                            <div className="bg-surface-3 rounded-lg p-4 border border-border-raised flex items-start gap-3">
+                                <MapPin className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                                <div>
+                                    <p className="text-sm font-semibold text-foreground">Pickup Location</p>
+                                    <p className="text-xs text-muted-foreground">Lost & Found Central Hub, Building C, Room 402</p>
+                                </div>
+                            </div>
+
+                            <Button
+                                onClick={() => setIsSuccessDialogOpen(false)}
+                                className="w-full bg-primary text-primary-foreground rounded-full py-6 font-semibold transition-all hover:scale-105"
+                            >
+                                Great, Thanks!
+                            </Button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }
