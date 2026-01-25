@@ -27,8 +27,8 @@ const {
 const {
   sendUserFoundNotification,
   sendAdminNotification,
+  sendFollowUpQuestionsEmail,
 } = require("../services/email");
-const crypto = require("crypto");
 
 // Configure Multer (Memory Storage)
 const upload = multer({ storage: multer.memoryStorage() });
@@ -152,9 +152,11 @@ router.post(
           // If >5 close matches, create refinement session
           const { data: closeMatches, count: closeMatchCount } = await supabase
             .from("matches")
-            .select("*, inventory:inventory(id, description)", { count: "exact" })
+            .select("*, inventory:inventory(id, description)", {
+              count: "exact",
+            })
             .eq("inquiry_id", inquiry.id)
-            .gt("score", 0.5)
+            .gte("score", 0.5)
             .order("score", { ascending: false })
             .limit(10);
 
@@ -166,7 +168,7 @@ router.post(
 
             const { questions } = await generateRefinementQuestions(
               finalDescription,
-              candidates
+              candidates,
             );
 
             const token = crypto.randomBytes(32).toString("hex");
@@ -941,7 +943,7 @@ router.post(
       // Fetch inquiry with gemini_data for keywords
       const { data: inquiry, error: inquiryError } = await supabase
         .from("inquiries")
-        .select("*")
+        .select("*, profiles:user_id(email)")
         .eq("id", id)
         .single();
 
@@ -958,17 +960,103 @@ router.post(
       // Trigger matching
       await findMatchesForInquiry(id, keywords);
 
-      // Fetch new matches
+      // Fetch new matches with inventory details
       const { data: matches, error: matchesError } = await supabase
         .from("matches")
-        .select("*")
+        .select("*, inventory:inventory(*)")
         .eq("inquiry_id", id)
         .order("score", { ascending: false });
 
+      let refinementSession = null;
+      let refinementNeeded = false;
+
+      // If multiple matches (e.g. > 1), trigger refinement logic
+      if (matches && matches.length > 1) {
+        // Check for existing pending session
+        const { data: existingSession } = await supabase
+          .from("refinement_sessions")
+          .select("*")
+          .eq("inquiry_id", id)
+          .eq("status", "pending")
+          .single();
+
+        if (existingSession) {
+          refinementSession = existingSession;
+          refinementNeeded = true;
+        } else {
+          // Generate new questions from Gemini
+          const candidateItems = matches
+            .map((m) => m.inventory)
+            .filter(Boolean);
+          if (candidateItems.length >= 2) {
+            try {
+              console.log(
+                `[Rematch] Generating refinement questions for ${candidateItems.length} candidates...`,
+              );
+              const { questions } = await generateRefinementQuestions(
+                inquiry.description,
+                candidateItems,
+              );
+
+              if (questions && questions.length > 0) {
+                const token = crypto.randomUUID();
+                const { data: newSession, error: sessionError } = await supabase
+                  .from("refinement_sessions")
+                  .insert({
+                    inquiry_id: id,
+                    token,
+                    questions,
+                    status: "pending",
+                  })
+                  .select()
+                  .single();
+
+                if (!sessionError) {
+                  refinementSession = newSession;
+                  refinementNeeded = true;
+                  console.log(
+                    `[Rematch] Refinement session created: ${newSession.id}`,
+                  );
+
+                  // Send email to user
+                  if (inquiry.profiles?.email) {
+                    // Use environment variable for app URL or default to localhost
+                    const appUrl =
+                      process.env.NEXT_PUBLIC_APP_URL ||
+                      "http://localhost:3000";
+                    const link = `${appUrl}/refine/${token}`;
+
+                    await sendFollowUpQuestionsEmail(inquiry.profiles.email, {
+                      inquiry_id: id,
+                      questions_link: link,
+                      question_count: questions.length,
+                    });
+                    console.log(
+                      `[Rematch] Refinement email sent to ${inquiry.profiles.email}`,
+                    );
+                  }
+                } else {
+                  console.error(
+                    "Failed to create refinement session:",
+                    sessionError,
+                  );
+                }
+              }
+            } catch (err) {
+              console.error("Failed to generate refinement questions:", err);
+            }
+          }
+        }
+      }
+
       res.status(200).json({
-        message: "Re-matching completed",
+        message: refinementNeeded
+          ? "Matches found, refinement required"
+          : "Re-matching completed",
         matches_found: matches?.length || 0,
         matches: matches || [],
+        refinement_needed: refinementNeeded,
+        refinement_session: refinementSession,
       });
     } catch (error) {
       console.error("Error re-matching inquiry:", error);
@@ -1286,7 +1374,7 @@ router.get("/my/inquiries", verifyToken, async (req, res) => {
               }
             : null,
         };
-      })
+      }),
     );
 
     res.status(200).json({ data: enrichedInquiries });

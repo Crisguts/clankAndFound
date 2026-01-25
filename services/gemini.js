@@ -2,29 +2,6 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-function cleanAndParseJSON(text) {
-  // 1. Remove markdown code blocks
-  let cleaned = text.replace(/```json/g, "").replace(/```/g, "");
-
-  // 2. Extract content between first '{' and last '}'
-  const firstBrace = cleaned.indexOf("{");
-  const lastBrace = cleaned.lastIndexOf("}");
-
-  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-    cleaned = cleaned.substring(firstBrace, lastBrace + 1);
-  }
-
-  // 3. Trim and Parse
-  try {
-    return JSON.parse(cleaned);
-  } catch (error) {
-    console.error("Failed to parse JSON from Gemini response. Raw text:", text);
-    // Attempt to salvage if it's just a small trailing character issue or similar,
-    // but for now, re-throwing is safest after logging.
-    throw new Error(`Gemini JSON Parse Error: ${error.message}`);
-  }
-}
-
 // 1. Generate Description from Image
 async function analyzeImage(imageBuffer, mimeType, userContext = null) {
   const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
@@ -57,7 +34,12 @@ async function analyzeImage(imageBuffer, mimeType, userContext = null) {
   const response = await result.response;
   const text = response.text();
 
-  return cleanAndParseJSON(text);
+  // Clean up code fences if present
+  const cleanedText = text
+    .replace(/```json/g, "")
+    .replace(/```/g, "")
+    .trim();
+  return JSON.parse(cleanedText);
 }
 
 // 2. Verify Match between Inquiry and Inventory
@@ -88,7 +70,12 @@ async function verifyMatch(inquiryText, inventoryText) {
   const response = await result.response;
   const text = response.text();
 
-  return cleanAndParseJSON(text);
+  const cleanedText = text
+    .replace(/```json/g, "")
+    .replace(/```/g, "")
+    .trim();
+
+  return JSON.parse(cleanedText);
 }
 
 // 3. Generate Follow-up Questions for Match Refinement
@@ -117,7 +104,12 @@ async function generateMatchQuestions(inquiryText, inventoryText) {
   const response = await result.response;
   const text = response.text();
 
-  return cleanAndParseJSON(text);
+  const cleanedText = text
+    .replace(/```json/g, "")
+    .replace(/```/g, "")
+    .trim();
+
+  return JSON.parse(cleanedText);
 }
 
 module.exports = {
@@ -168,7 +160,12 @@ async function generateRefinementQuestions(inquiryText, candidates) {
   const response = await result.response;
   const text = response.text();
 
-  return cleanAndParseJSON(text);
+  const cleanedText = text
+    .replace(/```json/g, "")
+    .replace(/```/g, "")
+    .trim();
+
+  return JSON.parse(cleanedText);
 }
 
 // 5. Refine Matches with User Answers
@@ -214,5 +211,10 @@ async function refineMatchesWithAnswers(inquiryText, answers, candidates) {
   const response = await result.response;
   const text = response.text();
 
-  return cleanAndParseJSON(text);
+  const cleanedText = text
+    .replace(/```json/g, "")
+    .replace(/```/g, "")
+    .trim();
+
+  return JSON.parse(cleanedText);
 }

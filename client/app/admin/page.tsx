@@ -176,7 +176,6 @@ export default function AdminPage() {
       const res = await fetch(`${API_BASE}/api/inventory/${deleteConfirmId}`, { method: "DELETE", headers })
       if (!res.ok) throw new Error("Failed to delete")
       setInventory(prev => prev.filter(item => item.id !== deleteConfirmId))
-      setInventory(prev => prev.filter(item => item.id !== id))
       toast({
         title: "Item archived",
         description: "The item has been moved to the archive.",
