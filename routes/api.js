@@ -129,6 +129,39 @@ router.post(
 
       const inquiry = insertData[0];
 
+    // Save to database
+    const { data: insertData, error: insertError } = await supabase
+      .from("inquiries")
+      .insert([{
+        user_id: userId,
+        image_url: imageUrl,
+        description: finalDescription,
+        gemini_data: analysis,
+        status: "submitted",
+      }])
+      .select();
+
+    if (insertError) {
+      console.error("Supabase Insert Error (Inquiries):", {
+        message: insertError.message,
+        details: insertError.details,
+        hint: insertError.hint,
+        code: insertError.code
+      });
+      return res.status(500).json({
+        error: "Failed to save inquiry",
+        details: insertError.message,
+        code: insertError.code
+      });
+    }
+
+    if (!insertData || insertData.length === 0) {
+      console.error("Supabase Insert returned no data for inquiries. Check RLS policies.");
+      return res.status(500).json({
+        error: "Failed to retrieve saved inquiry",
+        details: "The database accepted the insert but RLS policies prevented retrieving the result."
+      });
+    }
       // Trigger matching process
       const keywords =
         analysis?.keywords || analysis?.short_description || finalDescription;
@@ -206,6 +239,19 @@ router.post(
           .json({ error: "Failed to upload image", details: uploadError });
       }
 
+    if (insertError) {
+      console.error("Supabase Insert Error (Inventory):", {
+        message: insertError.message,
+        details: insertError.details,
+        hint: insertError.hint,
+        code: insertError.code
+      });
+      return res.status(500).json({
+        error: "Failed to save inventory item",
+        details: insertError.message,
+        code: insertError.code
+      });
+    }
       const {
         data: { publicUrl },
       } = supabase.storage.from("items").getPublicUrl(fileName);

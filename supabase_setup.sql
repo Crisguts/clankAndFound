@@ -7,9 +7,10 @@ drop table if exists profiles cascade;
 -- (Removed vector extension)
 
 -- 1. PROFILES (Manage Roles: 'user' vs 'assistant')
-create table profiles (
+create table if not exists profiles (
   id uuid references auth.users(id) on delete cascade primary key,
   email text,
+  full_name text,
   role text check (role in ('user', 'assistant')) default 'user',
   created_at timestamptz default now()
 );
@@ -17,14 +18,32 @@ create table profiles (
 -- Trigger to create profile on signup
 create or replace function public.handle_new_user()
 returns trigger as $$
+declare
+  default_role text := 'user';
 begin
-  insert into public.profiles (id, email, role)
-  values (new.id, new.email, 'user');
+  -- Check if this is the first user, make them assistant (optional, but helpful for dev)
+  -- if not exists (select 1 from public.profiles) then
+  --   default_role := 'assistant';
+  -- end if;
+
+  insert into public.profiles (id, email, full_name, role)
+  values (
+    new.id, 
+    new.email, 
+    coalesce(new.raw_user_meta_data->>'full_name', ''),
+    default_role
+  )
+  on conflict (id) do update set
+    email = excluded.email,
+    full_name = excluded.full_name;
+    
   return new;
 end;
 $$ language plpgsql security definer;
 
-create or replace trigger on_auth_user_created
+-- Re-create trigger
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
 
@@ -87,8 +106,8 @@ on inventory for all
 using ( exists (select 1 from profiles where id = auth.uid() and role = 'assistant') );
 
 -- Inquiries: Users see OWN, Assistants see ALL
-create policy "Users can insert inquiries" on inquiries for insert to authenticated with check (auth.uid() = user_id);
-create policy "Public can insert inquiries" on inquiries for insert to public with check (true);  -- Allow all inserts for testing
+create policy "Anyone can insert inquiries" on inquiries for insert with check (true);
+create policy "Anyone can select inquiries" on inquiries for select using (true); -- Relaxed for testing/matching
 create policy "Public can select own insert" on inquiries for select to public using (user_id is null);  -- Anonymous can read anonymous submissions
 create policy "Users can select own inquiries" on inquiries for select to authenticated using (auth.uid() = user_id);
 create policy "Assistants can select all inquiries" on inquiries for select to authenticated using ( exists (select 1 from profiles where id = auth.uid() and role = 'assistant') );
@@ -97,10 +116,10 @@ create policy "Assistants can update inquiries" on inquiries for update to authe
 create policy "Public can insert inventory" on inventory for insert to public with check (true);
 create policy "Public can read inventory" on inventory for select to public using (true);
 
--- Matches: ASSISTANTS ONLY
-create policy "Assistants can do everything on matches"
-on matches for all
-using ( exists (select 1 from profiles where id = auth.uid() and role = 'assistant') );
+-- Matches: Allow backend to insert, Assistants to manage
+create policy "Anyone can insert matches" on matches for insert with check (true);
+create policy "Anyone can select matches" on matches for select using (true);
+create policy "Assistants can update matches" on matches for update using ( exists (select 1 from profiles where id = auth.uid() and role = 'assistant') );
 
 -- Storage
 insert into storage.buckets (id, name, public) values ('images', 'images', true) on conflict (id) do nothing;
