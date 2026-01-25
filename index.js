@@ -18,15 +18,15 @@ const upload = multer({ storage: multer.memoryStorage() });
 app.set("upload", upload);
 
 // Serve static files from React build
-app.use(express.static(path.join(__dirname, "dist")));
+app.use(express.static(path.join(__dirname, 'client/out')));
 
 // API routes
-const apiRoutes = require("./routes/api");
-app.use("/api", apiRoutes);
+const apiRoutes = require('./routes/api');
+app.use('/api', apiRoutes);
 
 // Serve React app for all other routes (Express 5.x compatible)
 app.use((req, res) => {
-  res.sendFile(path.join(__dirname, "dist", "index.html"));
+  res.sendFile(path.join(__dirname, 'client/out', 'index.html'));
 });
 
 const PORT = process.env.PORT || 8080;
