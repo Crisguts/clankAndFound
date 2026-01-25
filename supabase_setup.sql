@@ -10,7 +10,6 @@ drop table if exists profiles cascade;
 create table profiles (
   id uuid references auth.users(id) on delete cascade primary key,
   email text,
-  full_name text,
   role text check (role in ('user', 'assistant')) default 'user',
   created_at timestamptz default now()
 );
@@ -19,13 +18,8 @@ create table profiles (
 create or replace function public.handle_new_user()
 returns trigger as $$
 begin
-  insert into public.profiles (id, email, full_name, role)
-  values (
-    new.id, 
-    new.email, 
-    new.raw_user_metadata->>'full_name',
-    'user'
-  );
+  insert into public.profiles (id, email, role)
+  values (new.id, new.email, 'user');
   return new;
 end;
 $$ language plpgsql security definer;
