@@ -205,7 +205,7 @@ export default function RefinePage() {
   return (
     <div className="w-full min-h-screen bg-background text-foreground">
       <Header />
-      
+
       {/* Demo Mode Banner */}
       {isDemo && (
         <div className="fixed top-16 left-0 right-0 z-40 bg-amber-500/90 text-amber-950 py-2 px-4 text-center text-sm font-medium backdrop-blur-sm">
@@ -241,11 +241,10 @@ export default function RefinePage() {
                       <Button
                         variant={answers[index] === "yes" ? "default" : "outline"}
                         onClick={() => handleAnswer(index, "yes")}
-                        className={`flex-1 min-w-[100px] rounded-full py-6 ${
-                          answers[index] === "yes"
+                        className={`flex-1 min-w-[100px] rounded-full py-6 ${answers[index] === "yes"
                             ? "bg-green-600 hover:bg-green-700 text-white"
                             : "hover:border-green-600 hover:text-green-600"
-                        }`}
+                          }`}
                       >
                         <CheckCircle2 className="mr-2 h-5 w-5" />
                         Yes
@@ -253,11 +252,10 @@ export default function RefinePage() {
                       <Button
                         variant={answers[index] === "no" ? "default" : "outline"}
                         onClick={() => handleAnswer(index, "no")}
-                        className={`flex-1 min-w-[100px] rounded-full py-6 ${
-                          answers[index] === "no"
+                        className={`flex-1 min-w-[100px] rounded-full py-6 ${answers[index] === "no"
                             ? "bg-red-600 hover:bg-red-700 text-white"
                             : "hover:border-red-600 hover:text-red-600"
-                        }`}
+                          }`}
                       >
                         <XCircle className="mr-2 h-5 w-5" />
                         No
@@ -265,11 +263,10 @@ export default function RefinePage() {
                       <Button
                         variant={answers[index] === "not_sure" ? "default" : "outline"}
                         onClick={() => handleAnswer(index, "not_sure")}
-                        className={`flex-1 min-w-[100px] rounded-full py-6 ${
-                          answers[index] === "not_sure"
+                        className={`flex-1 min-w-[100px] rounded-full py-6 ${answers[index] === "not_sure"
                             ? "bg-amber-600 hover:bg-amber-700 text-white"
                             : "hover:border-amber-600 hover:text-amber-600"
-                        }`}
+                          }`}
                       >
                         <HelpCircle className="mr-2 h-5 w-5" />
                         Not Sure
