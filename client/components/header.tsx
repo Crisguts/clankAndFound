@@ -3,15 +3,23 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { ArrowUpRight, User, LogOut } from "lucide-react"
+import { ArrowUpRight, User, LogOut, Sparkles } from "lucide-react"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { PaletteToggle } from "@/components/palette-toggle"
 import { supabase } from "@/lib/supabase"
+import { isDemoMode, DEMO_USER } from "@/lib/demo-mode"
 
 export default function Header() {
   const [user, setUser] = useState<any>(null)
+  const isDemo = isDemoMode()
 
   useEffect(() => {
+    // In demo mode, automatically set a demo user
+    if (isDemo) {
+      setUser(DEMO_USER)
+      return
+    }
+
     const fetchUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       setUser(user)
@@ -23,9 +31,14 @@ export default function Header() {
     })
 
     return () => subscription.unsubscribe()
-  }, [])
+  }, [isDemo])
 
   const handleSignOut = async () => {
+    if (isDemo) {
+      // In demo mode, just redirect to home
+      window.location.href = "/"
+      return
+    }
     await supabase.auth.signOut()
     window.location.href = "/"
   }
@@ -43,6 +56,12 @@ export default function Header() {
 
           {user ? (
             <div className="flex items-center gap-3">
+              {isDemo && (
+                <span className="hidden sm:inline-flex items-center gap-1.5 bg-amber-500/20 text-amber-600 px-3 py-1 rounded-full text-xs font-medium">
+                  <Sparkles className="h-3 w-3" />
+                  Demo Mode
+                </span>
+              )}
               <Link href="/profile" className="hidden sm:flex items-center gap-2 bg-surface-2 border border-border rounded-full px-4 py-1.5 hover:border-primary transition-all">
                 <div className="w-6 h-6 bg-primary/20 rounded-full flex items-center justify-center">
                   <User className="h-3 w-3 text-primary" />

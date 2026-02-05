@@ -5,6 +5,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, Lock, Eye, EyeOff, CheckCircle2 } from "lucide-react"
 import { supabase } from "@/lib/supabase"
+import { isDemoMode } from "@/lib/demo-mode"
 
 export default function ResetPasswordPage() {
     const [password, setPassword] = useState("")
@@ -14,8 +15,15 @@ export default function ResetPasswordPage() {
     const [isCheckingSession, setIsCheckingSession] = useState(true)
     const [isSuccess, setIsSuccess] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const isDemo = isDemoMode()
 
     useEffect(() => {
+        // In demo mode, redirect to search immediately
+        if (isDemo) {
+            window.location.href = "/search"
+            return
+        }
+
         const checkSession = async () => {
             const { data: { session } } = await supabase.auth.getSession()
             if (session) {
@@ -38,7 +46,7 @@ export default function ResetPasswordPage() {
         })
 
         return () => subscription.unsubscribe()
-    }, [])
+    }, [isDemo])
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()

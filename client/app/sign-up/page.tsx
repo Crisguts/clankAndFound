@@ -2,11 +2,12 @@
 
 import React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, Eye, EyeOff, CheckCircle } from "lucide-react"
 import { supabase } from "@/lib/supabase"
+import { isDemoMode } from "@/lib/demo-mode"
 
 import { ThemeToggle } from "@/components/theme-toggle"
 import { PaletteToggle } from "@/components/palette-toggle"
@@ -21,6 +22,14 @@ export default function SignUpPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isSuccess, setIsSuccess] = useState(false)
+  const isDemo = isDemoMode()
+
+  // In demo mode, redirect to search immediately
+  useEffect(() => {
+    if (isDemo) {
+      window.location.href = "/search"
+    }
+  }, [isDemo])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

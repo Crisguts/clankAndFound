@@ -5,8 +5,9 @@ import { useSearchParams } from "next/navigation"
 import Header from "@/components/header"
 import Footer from "@/components/footer"
 import { Button } from "@/components/ui/button"
-import { CheckCircle2, XCircle, HelpCircle, Loader2, AlertCircle } from "lucide-react"
+import { CheckCircle2, XCircle, HelpCircle, Loader2, AlertCircle, AlertTriangle } from "lucide-react"
 import Link from "next/link"
+import { isDemoMode, DEMO_MESSAGE } from "@/lib/demo-mode"
 
 interface Question {
   text: string
@@ -17,9 +18,17 @@ type Answer = "yes" | "no" | "not_sure"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
 
+// Demo questions for simulation
+const DEMO_QUESTIONS: Question[] = [
+  { text: "Is the item primarily black in color?", type: "yes_no" },
+  { text: "Does the item have any visible branding or logos?", type: "yes_no" },
+  { text: "Was the item made of leather or faux leather?", type: "yes_no" },
+]
+
 export default function RefinePage() {
   const searchParams = useSearchParams()
   const token = searchParams.get("token")
+  const isDemo = isDemoMode()
 
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -31,6 +40,14 @@ export default function RefinePage() {
   const [remainingMatches, setRemainingMatches] = useState<number | null>(null)
 
   useEffect(() => {
+    // In demo mode, use mock questions
+    if (isDemo) {
+      setQuestions(DEMO_QUESTIONS)
+      setInquiryDescription("Black leather wallet with initials")
+      setLoading(false)
+      return
+    }
+
     if (!token) {
       setError("Invalid or missing token")
       setLoading(false)
@@ -38,7 +55,7 @@ export default function RefinePage() {
     }
 
     fetchSession()
-  }, [token])
+  }, [token, isDemo])
 
   const fetchSession = async () => {
     try {
@@ -65,6 +82,15 @@ export default function RefinePage() {
   const handleSubmit = async () => {
     setSubmitting(true)
     setError(null)
+
+    // In demo mode, simulate submission
+    if (isDemo) {
+      await new Promise(resolve => setTimeout(resolve, 1500))
+      setRemainingMatches(2)
+      setSubmitted(true)
+      setSubmitting(false)
+      return
+    }
 
     try {
       const formattedAnswers = questions.map((q, i) => ({
@@ -179,7 +205,16 @@ export default function RefinePage() {
   return (
     <div className="w-full min-h-screen bg-background text-foreground">
       <Header />
-      <main className="max-w-[800px] mx-auto pt-24 px-4 md:px-6 pb-12">
+      
+      {/* Demo Mode Banner */}
+      {isDemo && (
+        <div className="fixed top-16 left-0 right-0 z-40 bg-amber-500/90 text-amber-950 py-2 px-4 text-center text-sm font-medium backdrop-blur-sm">
+          <AlertTriangle className="inline-block w-4 h-4 mr-2" />
+          {DEMO_MESSAGE}
+        </div>
+      )}
+
+      <main className={`max-w-[800px] mx-auto ${isDemo ? 'pt-32' : 'pt-24'} px-4 md:px-6 pb-12`}>
         <div className="bg-surface-1 rounded-[2.5rem] p-2 shadow-2xl">
           <div className="bg-surface-2 rounded-[2rem] p-1.5 border border-border">
             <div className="bg-surface-3 rounded-[1.75rem] border border-border-raised p-8 md:p-12">

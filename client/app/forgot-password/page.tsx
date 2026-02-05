@@ -1,10 +1,11 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, Mail, CheckCircle2 } from "lucide-react"
 import { supabase } from "@/lib/supabase"
+import { isDemoMode } from "@/lib/demo-mode"
 
 export default function ForgotPasswordPage() {
     const [email, setEmail] = useState("")
@@ -12,6 +13,14 @@ export default function ForgotPasswordPage() {
     const [isSubmitted, setIsSubmitted] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [validationError, setValidationError] = useState<string | null>(null)
+    const isDemo = isDemoMode()
+
+    // In demo mode, redirect to search immediately
+    useEffect(() => {
+        if (isDemo) {
+            window.location.href = "/search"
+        }
+    }, [isDemo])
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()

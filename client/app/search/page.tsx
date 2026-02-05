@@ -9,8 +9,9 @@ import { BeanGuide } from "@/components/search/bean-guide"
 import { SearchResults } from "@/components/search/search-results"
 import { ModeToggle, type AppMode } from "@/components/search/mode-toggle"
 import { Button } from "@/components/ui/button"
-import { Search, Upload, Sparkles, CheckCircle2 } from "lucide-react"
+import { Search, Upload, Sparkles, CheckCircle2, AlertTriangle } from "lucide-react"
 import { supabase } from "@/lib/supabase"
+import { isDemoMode, DEMO_USER, DEMO_MESSAGE } from "@/lib/demo-mode"
 import Link from "next/link"
 
 export type SearchState = "idle" | "text-only" | "image-only" | "both" | "searching" | "results" | "submitted"
@@ -36,8 +37,16 @@ export default function SearchPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [submittedInquiryId, setSubmittedInquiryId] = useState<string | null>(null)
+  const isDemo = isDemoMode()
 
   useEffect(() => {
+    // In demo mode, automatically set a demo user and skip auth
+    if (isDemo) {
+      setUser(DEMO_USER)
+      setIsLoading(false)
+      return
+    }
+
     const fetchUser = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser()
@@ -68,7 +77,7 @@ export default function SearchPage() {
     })
 
     return () => subscription.unsubscribe()
-  }, [])
+  }, [isDemo])
 
   const handleModeChange = useCallback((newMode: AppMode) => {
     setMode(newMode)
@@ -113,6 +122,15 @@ export default function SearchPage() {
     setIsSearching(true)
     setSearchState("searching")
     setError(null)
+
+    // In demo mode, simulate a search and show submitted state
+    if (isDemo) {
+      await new Promise(resolve => setTimeout(resolve, 2000)) // Simulate loading
+      setSubmittedInquiryId('demo-inquiry-' + Date.now())
+      setSearchState("submitted")
+      setIsSearching(false)
+      return
+    }
 
     try {
       // Get auth token
@@ -162,7 +180,7 @@ export default function SearchPage() {
     } finally {
       setIsSearching(false)
     }
-  }, [textQuery, uploadedFile, mode, user])
+  }, [textQuery, uploadedFile, mode, user, isDemo])
 
   const handleReset = useCallback(() => {
     setTextQuery("")
@@ -180,7 +198,15 @@ export default function SearchPage() {
     <div className="w-full min-h-screen bg-background text-foreground">
       <Header />
 
-      <main className="max-w-[1200px] mx-auto pt-24 px-4 md:px-6 pb-12">
+      {/* Demo Mode Banner */}
+      {isDemo && (
+        <div className="fixed top-16 left-0 right-0 z-40 bg-amber-500/90 text-amber-950 py-2 px-4 text-center text-sm font-medium backdrop-blur-sm">
+          <AlertTriangle className="inline-block w-4 h-4 mr-2" />
+          {DEMO_MESSAGE}
+        </div>
+      )}
+
+      <main className={`max-w-[1200px] mx-auto ${isDemo ? 'pt-32' : 'pt-24'} px-4 md:px-6 pb-12`}>
         {isLoading ? (
           <div className="flex flex-col items-center justify-center min-h-[400px]">
             <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />

@@ -15,7 +15,8 @@ import {
   Clock,
   CheckCheck,
   RefreshCw,
-  AlertCircle
+  AlertCircle,
+  AlertTriangle
 } from "lucide-react"
 import {
   Select,
@@ -26,6 +27,7 @@ import {
 } from "@/components/ui/select"
 import { useToast } from "@/components/ui/use-toast"
 import { supabase } from "@/lib/supabase"
+import { isDemoMode, DEMO_USER, DEMO_MESSAGE, DEMO_INVENTORY, DEMO_MATCHES, DEMO_INQUIRIES } from "@/lib/demo-mode"
 import Link from "next/link"
 
 export type ItemStatus = "active" | "claimed" | "archived"
@@ -81,9 +83,22 @@ export default function AdminPage() {
   const [stats, setStats] = useState<any>(null)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
   const [validationErrors, setValidationErrors] = useState<{ image?: string; description?: string; location?: string }>({})
+  const isDemo = isDemoMode()
 
   // Check auth and role
   useEffect(() => {
+    // In demo mode, use mock data and skip auth
+    if (isDemo) {
+      setUser(DEMO_USER)
+      setIsAuthorized(true)
+      setInventory(DEMO_INVENTORY as InventoryItem[])
+      setMatches(DEMO_MATCHES as Match[])
+      setInquiries(DEMO_INQUIRIES as Inquiry[])
+      setStats({ active_items: 3, pending_matches: 1, total_inquiries: 2 })
+      setIsLoading(false)
+      return
+    }
+
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) {
@@ -107,10 +122,12 @@ export default function AdminPage() {
     }
 
     checkAuth()
-  }, [])
+  }, [isDemo])
 
   // Fetch data based on active tab
   useEffect(() => {
+    // In demo mode, data is already loaded in the auth check
+    if (isDemo) return
     if (!isAuthorized) return
 
     const fetchData = async () => {
@@ -443,7 +460,15 @@ export default function AdminPage() {
     <div className="w-full min-h-screen bg-background">
       <Header />
 
-      <main className="max-w-[1400px] mx-auto pt-24 px-4 md:px-6 pb-12">
+      {/* Demo Mode Banner */}
+      {isDemo && (
+        <div className="fixed top-16 left-0 right-0 z-40 bg-amber-500/90 text-amber-950 py-2 px-4 text-center text-sm font-medium backdrop-blur-sm">
+          <AlertTriangle className="inline-block w-4 h-4 mr-2" />
+          {DEMO_MESSAGE}
+        </div>
+      )}
+
+      <main className={`max-w-[1400px] mx-auto ${isDemo ? 'pt-32' : 'pt-24'} px-4 md:px-6 pb-12`}>
         {/* Page Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-foreground mb-2" style={{ fontFamily: "var(--font-geist-sans)" }}>

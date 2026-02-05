@@ -4,9 +4,10 @@ import React from "react"
 import { useState, useCallback, useEffect } from "react"
 import Header from "@/components/header"
 import { Button } from "@/components/ui/button"
-import { Package, CheckCircle, Clock, AlertCircle, X, MapPin, Sparkles, MessageSquare, ChevronRight } from "lucide-react"
+import { Package, CheckCircle, Clock, AlertCircle, X, MapPin, Sparkles, MessageSquare, ChevronRight, AlertTriangle } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import { supabase } from "@/lib/supabase"
+import { isDemoMode, DEMO_USER, DEMO_MESSAGE, DEMO_INQUIRIES, DEMO_MATCHES } from "@/lib/demo-mode"
 import Link from "next/link"
 import {
     Dialog,
@@ -60,8 +61,18 @@ export default function ProfilePage() {
     const [activeTab, setActiveTab] = useState<"inquiries" | "matches" | "history">("matches")
     const [isSuccessDialogOpen, setIsSuccessDialogOpen] = useState(false)
     const [claimedItemName, setClaimedItemName] = useState("")
+    const isDemo = isDemoMode()
 
     useEffect(() => {
+        // In demo mode, use mock data
+        if (isDemo) {
+            setUser(DEMO_USER)
+            setInquiries(DEMO_INQUIRIES as Inquiry[])
+            setMatches(DEMO_MATCHES as Match[])
+            setIsLoading(false)
+            return
+        }
+
         const init = async () => {
             const { data: { session } } = await supabase.auth.getSession()
             if (!session) {
@@ -86,7 +97,7 @@ export default function ProfilePage() {
             setIsLoading(false)
         }
         init()
-    }, [])
+    }, [isDemo])
 
     const fetchData = async (token: string) => {
         try {
@@ -108,6 +119,14 @@ export default function ProfilePage() {
     }
 
     const handleClaim = useCallback(async (matchId: string, itemDescription: string) => {
+        // In demo mode, simulate the claim
+        if (isDemo) {
+            setClaimedItemName(itemDescription)
+            setMatches(prev => prev.filter(m => m.id !== matchId))
+            setIsSuccessDialogOpen(true)
+            return
+        }
+
         try {
             const { data: { session } } = await supabase.auth.getSession()
             if (!session) return
@@ -129,7 +148,7 @@ export default function ProfilePage() {
                 variant: "destructive",
             })
         }
-    }, [])
+    }, [isDemo])
 
     const getStatusBadge = (inq: Inquiry) => {
         // If there's a pending refinement session, show refinement status
@@ -178,7 +197,15 @@ export default function ProfilePage() {
         <div className="w-full min-h-screen bg-background">
             <Header />
 
-            <main className="max-w-4xl mx-auto pt-24 px-4 md:px-6 pb-12">
+            {/* Demo Mode Banner */}
+            {isDemo && (
+                <div className="fixed top-16 left-0 right-0 z-40 bg-amber-500/90 text-amber-950 py-2 px-4 text-center text-sm font-medium backdrop-blur-sm">
+                    <AlertTriangle className="inline-block w-4 h-4 mr-2" />
+                    {DEMO_MESSAGE}
+                </div>
+            )}
+
+            <main className={`max-w-4xl mx-auto ${isDemo ? 'pt-32' : 'pt-24'} px-4 md:px-6 pb-12`}>
                 <div className="mb-8">
                     <h1 className="text-3xl font-bold text-foreground mb-2" style={{ fontFamily: "var(--font-geist-sans)" }}>
                         My Profile
